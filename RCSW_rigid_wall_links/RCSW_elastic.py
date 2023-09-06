@@ -866,3 +866,13 @@ lower_right_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/lowerRigh
 
 tir_y_right_edge = np.maximum(upper_right_corner_dispY, lower_right_corner_dispY) / (0.5*(upper_right_corner_dispY + lower_right_corner_dispY))
 tir_y_bottom_edge = np.maximum(lower_left_corner_dispY, lower_right_corner_dispY) / (0.5*(lower_left_corner_dispY + lower_right_corner_dispY))
+
+# ============================================================================
+# Post-process MRSA results
+# ============================================================================
+
+
+# ============================================================================
+# Perform ELF
+# ============================================================================
+
