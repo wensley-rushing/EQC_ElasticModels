@@ -18,6 +18,7 @@ sys.path.append('../')
 
 from helper_functions.create_floor_shell import refine_mesh
 from helper_functions.create_floor_shell import create_shell
+from helper_functions.cqc_modal_combo import modal_combo
 
 
 # Define Units
@@ -818,6 +819,12 @@ if mrsa:
         ops.recorder('Element', '-file', mrsa_res_folder + 'floor11_wallResp.txt', '-precision', 9, '-region', 411, 'force')
 
         # Create recorders to store nodal displacements at the building edges
+        ops.recorder('Node', '-file', mrsa_res_folder + 'lowerLeftCornerDisp.txt', '-node', *list(wall_ends_node_tags.loc['wall1_l'])[1:], '-dof', direcs[ii], 'disp')
+        # ops.recorder('Node', '-file', mrsa_res_folder + 'middleLeftCornerDisp.txt', '-node', *list(wall_ends_node_tags.loc['wall5_r'])[1:], '-dof', direcs[ii], 'disp')
+        # ops.recorder('Node', '-file', mrsa_res_folder + 'middleCenterCornerDisp.txt', '-node', *list(wall_ends_node_tags.loc['wall8_l'])[1:], '-dof', direcs[ii], 'disp')  # Not the exact node
+        # ops.recorder('Node', '-file', mrsa_res_folder + 'upperLeftCornerDisp.txt', '-node', *list(wall_ends_node_tags.loc['wall9_l'])[1:], '-dof', direcs[ii], 'disp')
+        ops.recorder('Node', '-file', mrsa_res_folder + 'upperRightCornerDisp.txt', '-node', *list(wall_ends_node_tags.loc['wall10_r'])[1:], '-dof', direcs[ii], 'disp')
+        ops.recorder('Node', '-file', mrsa_res_folder + 'lowerRightCornerDisp.txt', '-node', *list(lfre_node_tags.loc['col3'])[1:], '-dof', direcs[ii], 'disp')
 
         # Base shear
         ops.recorder('Node', '-file', mrsa_res_folder + 'baseShear' + axis[ii] + '.txt', '-node', *lfre_node_tags['00'].tolist(), '-dof', direcs[ii], 'reaction')
@@ -834,3 +841,28 @@ if mrsa:
 
 # Clear model
 ops.wipe()
+
+print('\nMRSA completed.')
+print('======================================================')
+
+
+# ============================================================================
+# Compute Torsional Irregularity Ratio (TIR)
+# ============================================================================
+# Obtain peak total response for corner node displacments
+
+# ===== MRSA - X
+lower_left_corner_dispX = modal_combo(np.loadtxt('./mrsa_results/dirX/lowerLeftCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
+upper_right_corner_dispX = modal_combo(np.loadtxt('./mrsa_results/dirX/upperRightCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
+lower_right_corner_dispX = modal_combo(np.loadtxt('./mrsa_results/dirX/lowerRightCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
+
+tir_x_right_edge = np.maximum(upper_right_corner_dispX, lower_right_corner_dispX) / (0.5*(upper_right_corner_dispX + lower_right_corner_dispX))
+tir_x_bottom_edge = np.maximum(lower_left_corner_dispX, lower_right_corner_dispX) / (0.5*(lower_left_corner_dispX + lower_right_corner_dispX))
+
+# ===== MRSA - Y
+lower_left_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/lowerLeftCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
+upper_right_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/upperRightCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
+lower_right_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/lowerRightCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
+
+tir_y_right_edge = np.maximum(upper_right_corner_dispY, lower_right_corner_dispY) / (0.5*(upper_right_corner_dispY + lower_right_corner_dispY))
+tir_y_bottom_edge = np.maximum(lower_left_corner_dispY, lower_right_corner_dispY) / (0.5*(lower_left_corner_dispY + lower_right_corner_dispY))
