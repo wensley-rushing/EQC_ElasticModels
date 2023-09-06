@@ -36,7 +36,7 @@ steel_E = 210 * GPa
 
 
 def create_beams(floor_num, elev, com_node, smf_node_tags, smf_coords_df, bm_prop, col_prop):
-    bm_tag = int('3' + floor_num + '01')   # 30101
+    bm_tag = int('2' + floor_num + '01')   # 20101
 
     create_bm_joint_offset(bm_tag, 'col2',  'col3', floor_num, elev, 'EW', com_node, smf_node_tags, smf_coords_df, bm_prop, col_prop)  # Beam 1
     create_bm_joint_offset(bm_tag + 1, 'col3',  'col4', floor_num, elev, 'EW', com_node, smf_node_tags, smf_coords_df, bm_prop, col_prop)  # Beam 2

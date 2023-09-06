@@ -18,8 +18,8 @@ import numpy as np
 # Append directory of helper functions to Pyhton Path
 sys.path.append('../')
 
-from helper_functions.helper_funcs import refine_mesh
-from helper_functions.helper_funcs import create_shell
+from helper_functions.create_floor_shell import refine_mesh
+from helper_functions.create_floor_shell import create_shell
 
 
 # Define font properties for plot labels
@@ -424,12 +424,9 @@ bm_J = 778 * 1E3 * mm**4
 
 wall_link_A = bm_A * 100
 wall_link_E = bm_E * 100
-wall_link_G = bm_G * 100
-wall_link_J = bm_J * 100
-wall_link_I = bm_I * 100
-
-wall_link_tag = 100
-ops.uniaxialMaterial('Elastic', wall_link_tag, wall_link_E)
+wall_link_G = bm_G
+wall_link_J = bm_J
+wall_link_I = bm_I
 
 wall_link_transf_tag_x = 2 # Walls oriented in Global-X direction
 wall_link_transf_tag_y = 3 # Walls oriented in Global-Y direction
@@ -678,7 +675,7 @@ ops.analyze(num_step_sWgt)
 # ============================================================================
 # Nonlinear static pushover
 # ============================================================================
-push = 1
+push = 0
 push_direc = 1 # Direction for pushover; 1: x-axis; 2: y-xis
 
 if push:

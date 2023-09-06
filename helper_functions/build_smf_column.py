@@ -57,7 +57,7 @@ def create_columns(floor_num, smf_node_tags, col_prop, beam_prop):
     col_Iz_NS = col_section_prop['Iy.1'] * 1E6 * mm**4  # weak Iyy
     col_transf_tag_NS = col_prop[4]
 
-    col_tag = int('2' + floor_num + '01')  # 20101
+    col_tag = int('3' + floor_num + '01')  # 30101
 
 
     # ============================================================================
@@ -197,9 +197,7 @@ def create_columns(floor_num, smf_node_tags, col_prop, beam_prop):
     pz_I = col_Iy_NS
     pzone_transf_tag_col = col_prop[5]
 
-
-    col_tag = int('2' + floor_num + '01')  # 20101
-    pz_tag = int(str(col_tag) + '1')  # 201011
+    pz_tag = int(str(col_tag) + '1')  # 301011
 
     for col in smf_node_tags.index.tolist():
         ops.element('elasticBeamColumn', pz_tag, int(str(smf_node_tags.loc[col][floor_num]) + '2'), smf_node_tags.loc[col][floor_num], pz_A, pz_E, pz_G, pz_J, pz_I, pz_I, pzone_transf_tag_col)

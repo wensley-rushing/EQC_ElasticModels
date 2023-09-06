@@ -472,23 +472,24 @@ def build_model():
         floor_bm_tags = []
 
         for tag in elem_tags:
+
             # Only select beam elements
-            if str(tag).startswith('3' + floor):
+            if str(tag).startswith('2' + floor):
                 floor_bm_tags.append(tag)
 
         beam_tags.append(floor_bm_tags)
 
-    ops.region(301, '-eleOnly', *beam_tags[0])  # Region for all beams on 1st floor
-    ops.region(302, '-eleOnly', *beam_tags[1])  # Region for all beams on 2nd floor
-    ops.region(303, '-eleOnly', *beam_tags[2])  # Region for all beams on 3rd floor
-    ops.region(304, '-eleOnly', *beam_tags[3])  # Region for all beams on 4th floor
-    ops.region(305, '-eleOnly', *beam_tags[4])  # Region for all beams on 5th floor
-    ops.region(306, '-eleOnly', *beam_tags[5])  # Region for all beams on 6th floor
-    ops.region(307, '-eleOnly', *beam_tags[6])  # Region for all beams on 7th floor
-    ops.region(308, '-eleOnly', *beam_tags[7])  # Region for all beams on 8th floor
-    ops.region(309, '-eleOnly', *beam_tags[8])  # Region for all beams on 9th floor
-    ops.region(310, '-eleOnly', *beam_tags[9])  # Region for all beams on 10th floor
-    ops.region(311, '-eleOnly', *beam_tags[10]) # Region for all beams on 11th floor
+    ops.region(201, '-eleOnly', *beam_tags[0])  # Region for all beams on 1st floor
+    ops.region(202, '-eleOnly', *beam_tags[1])  # Region for all beams on 2nd floor
+    ops.region(203, '-eleOnly', *beam_tags[2])  # Region for all beams on 3rd floor
+    ops.region(204, '-eleOnly', *beam_tags[3])  # Region for all beams on 4th floor
+    ops.region(205, '-eleOnly', *beam_tags[4])  # Region for all beams on 5th floor
+    ops.region(206, '-eleOnly', *beam_tags[5])  # Region for all beams on 6th floor
+    ops.region(207, '-eleOnly', *beam_tags[6])  # Region for all beams on 7th floor
+    ops.region(208, '-eleOnly', *beam_tags[7])  # Region for all beams on 8th floor
+    ops.region(209, '-eleOnly', *beam_tags[8])  # Region for all beams on 9th floor
+    ops.region(210, '-eleOnly', *beam_tags[9])  # Region for all beams on 10th floor
+    ops.region(211, '-eleOnly', *beam_tags[10]) # Region for all beams on 11th floor
 
 
 # Create pvd recorder
