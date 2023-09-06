@@ -160,13 +160,19 @@ cython_debug/
 #.idea/
 
 # Avi files
-.avi
+*.avi
 
 # PVD files & folder
 pvd/
-.vtu
-.pvd
+*.vtu
+*.pvd
 
 # PDF & SVG files
-.svg
-.pdf
+*.svg
+*.pdf
+
+# Results folder
+*results/
+
+# Mode shape animations
+modeShapeAnimations/
