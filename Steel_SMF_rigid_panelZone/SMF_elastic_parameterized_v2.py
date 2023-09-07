@@ -155,23 +155,11 @@ for val in unique_ys:
 # ============================================================================
 # Load in New Zealand steel section database
 # ============================================================================
-steel_data_nzs_UB = pd.read_excel('../../../nzs_steel_sections.xlsx', sheet_name='UB',
+nzs_beams = pd.read_excel('../../../nzs_steel_database.xlsx', sheet_name='Beams',
                                index_col='Designation')
 
-steel_data_nzs_UC = pd.read_excel('../../../nzs_steel_sections.xlsx', sheet_name='UC',
+nzs_cols = pd.read_excel('../../../nzs_steel_database.xlsx', sheet_name='Columns',
                                index_col='Designation')
-
-
-# ============================================================================
-# Load in AISC steel section database
-# ============================================================================
-steel_data_metric = pd.read_excel('../../../aisc-shapes-database-v16.0.xlsx', sheet_name='Database v16.0',
-                               usecols='A, B, C,CH:CK,CP,CU,CX,DK,DN,DQ:DX,EB,FH', index_col='AISC_Manual_Label')
-
-# Select only W14 sections from database for columns
-col_filter = steel_data_metric['EDI_Std_Nomenclature'].str.startswith('W14')
-smf_col_database = steel_data_metric[col_filter]
-
 
 # ============================================================================
 # Define shell properties for floor diaphragm
@@ -234,24 +222,23 @@ bm_E = steel_E
 bm_G = bm_E / (2*(1 + bm_nu))
 
 # Initialize array of possible values for beam Ix
-bm_mom_inertia_strong = np.array(list(steel_data_nzs_UB['Ix']))
+bm_mom_inertia_strong = np.array(list(nzs_beams['Ix']))
 
-# The geometric properties of the beams will be defined using a 610UB125 (W24x84)
-smf_beam_prop = steel_data_nzs_UB.loc['610UB125'].copy()
-# bm_d = smf_beam_prop['d'] * mm
+# The geometric properties of the beams will be defined using a 800WB168
+smf_beam_prop = nzs_beams.loc['800WB168'].copy()
 
 bm_transf_tag_x = 3  # Beams oriented in Global-X direction
 bm_transf_tag_y = 4  # Beams oriented in Global-Y direction
 
 base_Ix = smf_beam_prop['Ix']  # No need to multiply by 'mm' or '1E6'
-bm_Ix_modif = [1, 1, 1, 1, 1]
-# bm_Ix_modif = [1, 0.8, 0.6, 0.4, 0.2]
+# bm_Ix_modif = [1, 1, 1, 1, 1]
+bm_Ix_modif = [1, 0.8, 0.6, 0.4, 0.2]
 
-bm_sect_flr_1 = steel_data_nzs_UB.loc[steel_data_nzs_UB.index[steel_data_nzs_UB['Ix'] >= bm_Ix_modif[0] * base_Ix].tolist()[-1]]
-bm_sect_flr_2_to_4 = steel_data_nzs_UB.loc[steel_data_nzs_UB.index[steel_data_nzs_UB['Ix'] >= bm_Ix_modif[1] * base_Ix].tolist()[-1]]
-bm_sect_flr_5_to_7 = steel_data_nzs_UB.loc[steel_data_nzs_UB.index[steel_data_nzs_UB['Ix'] >= bm_Ix_modif[2] * base_Ix].tolist()[-1]]
-bm_sect_flr_8_to_10 = steel_data_nzs_UB.loc[steel_data_nzs_UB.index[steel_data_nzs_UB['Ix'] >= bm_Ix_modif[3] * base_Ix].tolist()[-1]]
-bm_sect_flr_11 = steel_data_nzs_UB.loc[steel_data_nzs_UB.index[steel_data_nzs_UB['Ix'] >= bm_Ix_modif[4] * base_Ix].tolist()[-1]]
+bm_sect_flr_1 = nzs_beams.loc[nzs_beams.index[nzs_beams['Ix'] >= bm_Ix_modif[0] * base_Ix].tolist()[-1]]
+bm_sect_flr_2_to_4 = nzs_beams.loc[nzs_beams.index[nzs_beams['Ix'] >= bm_Ix_modif[1] * base_Ix].tolist()[-1]]
+bm_sect_flr_5_to_7 = nzs_beams.loc[nzs_beams.index[nzs_beams['Ix'] >= bm_Ix_modif[2] * base_Ix].tolist()[-1]]
+bm_sect_flr_8_to_10 = nzs_beams.loc[nzs_beams.index[nzs_beams['Ix'] >= bm_Ix_modif[3] * base_Ix].tolist()[-1]]
+bm_sect_flr_11 = nzs_beams.loc[nzs_beams.index[nzs_beams['Ix'] >= bm_Ix_modif[4] * base_Ix].tolist()[-1]]
 
 # Assume linear relationship
 # Base Ix & slope
@@ -274,11 +261,11 @@ col_transf_tag_NS = 2
 
 col_beam_mom_ratio = 1.25
 
-col_sect_flr_1 = smf_col_database.loc[smf_col_database.index[smf_col_database['Zx.1'] >= col_beam_mom_ratio * bm_sect_flr_1['Zx']].tolist()[-1]]
-col_sect_flr_2_to_4 = smf_col_database.loc[smf_col_database.index[smf_col_database['Zx.1'] >= col_beam_mom_ratio * bm_sect_flr_2_to_4['Zx']].tolist()[-1]]
-col_sect_flr_5_to_7 = smf_col_database.loc[smf_col_database.index[smf_col_database['Zx.1'] >= col_beam_mom_ratio * bm_sect_flr_5_to_7['Zx']].tolist()[-1]]
-col_sect_8_to_10 = smf_col_database.loc[smf_col_database.index[smf_col_database['Zx.1'] >= col_beam_mom_ratio * bm_sect_flr_8_to_10['Zx']].tolist()[-1]]
-col_sect_flr_11 = smf_col_database.loc[smf_col_database.index[smf_col_database['Zx.1'] >= col_beam_mom_ratio * bm_sect_flr_11['Zx']].tolist()[-1]]
+col_sect_flr_1 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= col_beam_mom_ratio * bm_sect_flr_1['Zx']].tolist()[-1]]
+col_sect_flr_2_to_4 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= col_beam_mom_ratio * bm_sect_flr_2_to_4['Zx']].tolist()[-1]]
+col_sect_flr_5_to_7 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= col_beam_mom_ratio * bm_sect_flr_5_to_7['Zx']].tolist()[-1]]
+col_sect_8_to_10 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= col_beam_mom_ratio * bm_sect_flr_8_to_10['Zx']].tolist()[-1]]
+col_sect_flr_11 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= col_beam_mom_ratio * bm_sect_flr_11['Zx']].tolist()[-1]]
 
 col_prop_flr_1 = [col_sect_flr_1, col_E, col_G, col_transf_tag_EW, col_transf_tag_NS, pzone_transf_tag_col]
 col_prop_flr_2_to_4 = [col_sect_flr_2_to_4, col_E, col_G, col_transf_tag_EW, col_transf_tag_NS, pzone_transf_tag_col]

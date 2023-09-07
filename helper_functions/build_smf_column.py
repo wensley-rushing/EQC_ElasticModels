@@ -44,17 +44,17 @@ def create_columns(floor_num, smf_node_tags, col_prop, beam_prop):
     col_G = col_prop[2]
 
     # col_d = col_section_prop['d.1'] * mm
-    col_A = col_section_prop['A.1'] * mm**2
-    col_J = col_section_prop['J.1'] * 1E3 * mm**4
+    col_A = col_section_prop['Ag'] * mm**2
+    col_J = col_section_prop['J'] * 1E3 * mm**4
 
     # East-West SMF columns
-    col_Iy_EW = col_section_prop['Iy.1'] * 1E6 * mm**4  # weak Iyy
-    col_Iz_EW = col_section_prop['Ix.1'] * 1E6 * mm**4   # strong Ixx
+    col_Iy_EW = col_section_prop['Iy'] * 1E6 * mm**4  # weak Iyy
+    col_Iz_EW = col_section_prop['Ix'] * 1E6 * mm**4   # strong Ixx
     col_transf_tag_EW = col_prop[3]
 
     #North-South SMF columns
-    col_Iy_NS = col_section_prop['Ix.1'] * 1E6 * mm**4  # strong Ixx
-    col_Iz_NS = col_section_prop['Iy.1'] * 1E6 * mm**4  # weak Iyy
+    col_Iy_NS = col_section_prop['Ix'] * 1E6 * mm**4  # strong Ixx
+    col_Iz_NS = col_section_prop['Iy'] * 1E6 * mm**4  # weak Iyy
     col_transf_tag_NS = col_prop[4]
 
     col_tag = int('3' + floor_num + '01')  # 30101

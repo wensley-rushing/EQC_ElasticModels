@@ -78,12 +78,12 @@ def create_bm_joint_offset(bm_tag, left_col, right_col, floor_num, elev, bm_orie
     # ==========================================================
     # Extract properties of panel zone rigid beam elements
     # ==========================================================
-    pz_w = col_prop['d.1'] * mm / 2  # Half the depth of panel zone region
-    pz_A = col_prop['A.1'] * 100 * mm**2
+    pz_w = col_prop['d'] * mm / 2  # Half the depth of panel zone region
+    pz_A = col_prop['Ag'] * 100 * mm**2
     pz_E = bm_E * 100
     pz_G = bm_G
-    pz_J = col_prop['J.1'] * 1E3 * mm**4
-    pz_I = col_prop['Ix.1'] * 1E6 * mm**4
+    pz_J = col_prop['J'] * 1E3 * mm**4
+    pz_I = col_prop['Ix'] * 1E6 * mm**4
 
     pzone_transf_tag_bm_x = bm_prop[5]
     pzone_transf_tag_bm_y = bm_prop[6]
