@@ -161,6 +161,7 @@ nzs_beams = pd.read_excel('../../../nzs_steel_database.xlsx', sheet_name='Beams'
 nzs_cols = pd.read_excel('../../../nzs_steel_database.xlsx', sheet_name='Columns',
                                index_col='Designation')
 
+nzs_cols = pd.concat([nzs_cols, nzs_beams])
 # ============================================================================
 # Define shell properties for floor diaphragm
 # ============================================================================
@@ -225,14 +226,14 @@ bm_G = bm_E / (2*(1 + bm_nu))
 bm_mom_inertia_strong = np.array(list(nzs_beams['Ix']))
 
 # The geometric properties of the beams will be defined using a 800WB168
-smf_beam_prop = nzs_beams.loc['800WB168'].copy()
+smf_beam_prop = nzs_beams.loc['1000WB215'].copy()
 
 bm_transf_tag_x = 3  # Beams oriented in Global-X direction
 bm_transf_tag_y = 4  # Beams oriented in Global-Y direction
 
 base_Ix = smf_beam_prop['Ix']  # No need to multiply by 'mm' or '1E6'
 # bm_Ix_modif = [1, 1, 1, 1, 1]
-bm_Ix_modif = [1, 0.8, 0.6, 0.4, 0.2]
+bm_Ix_modif = [1, 0.8, 0.6, 0.5, 0.4]
 
 bm_sect_flr_1 = nzs_beams.loc[nzs_beams.index[nzs_beams['Ix'] >= bm_Ix_modif[0] * base_Ix].tolist()[-1]]
 bm_sect_flr_2_to_4 = nzs_beams.loc[nzs_beams.index[nzs_beams['Ix'] >= bm_Ix_modif[1] * base_Ix].tolist()[-1]]
@@ -683,7 +684,7 @@ return_per_factor_sls = 0.25
 return_per_factor_uls = 1.3
 fault_factor = 1.0
 perform_factor = 0.7
-ductility_factor = 4.0  # SMF
+ductility_factor = 3.0  # SMF  4.0
 story_weights = np.array(list(total_floor_mass.values())) * grav_metric
 seismic_weight = story_weights.sum()
 
@@ -717,15 +718,33 @@ story_driftY = compute_story_drifts(com_dispY, story_heights, lambda_list, dampi
 story_driftX *=  (ductility_factor * pdelta_fac * drift_modif_fac)
 story_driftY *=  (ductility_factor * pdelta_fac * drift_modif_fac)
 
-max_story_drift = max(story_driftX.max(), story_driftY.max())
-print('\nMaximum story drift: {:.2f}%'.format(max_story_drift))
-
 # CHECK DRIFT REQUIREMENTS
-drift_ok = max_story_drift < 2.5  # MAximum story drift limit = 2.5%
+max_story_drift = max(story_driftX.max(), story_driftY.max())
+drift_ok = max_story_drift < 2.5  # Maximum story drift limit = 2.5%  NZS 1170.5:2004 - Sect 7.5.1
 
-# CHECK STABILITY REQUIREMENTS (P-DELTA)
+print('\nMaximum story drift: {:.2f}%'.format(max_story_drift))
+if drift_ok:
+    print('Story drift requirements satisfied.')
+else:
+    print('Story drift requirements NOT satisfied.')
+
+
+# CHECK STABILITY REQUIREMENTS (P-DELTA) NZS 1170.5:2004 - Sect 6.5.1
+thetaX = story_weights * 0.01 * story_driftX / (elf_force_distrib * story_heights)
+thetaY = story_weights * 0.01 * story_driftY / (elf_force_distrib * story_heights)
+
+max_theta = max(thetaX.max(), thetaY.max())
+theta_ok = max_theta < 0.3
+
+print('\nMaximum stability coefficient: {:.2f}'.format(max_theta))
+if theta_ok:
+    print('Stability requirements satisfied.')
+else:
+    print('Stability requirements NOT satisfied.')
 
 # CHECK STRENGTH REQUIREMENTS
+
+
 """
 '========================================================================='
 'NEED TO SATISFY DRIFT, STABILITY & STRENGTH REQUIREMENTS BEFORE DOING THIS'
