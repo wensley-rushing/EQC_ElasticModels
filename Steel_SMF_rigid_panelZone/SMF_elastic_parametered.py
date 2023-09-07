@@ -50,8 +50,6 @@ MPa = 1 * N/mm**2       # Megapascal
 GPa = 1000 * N/mm**2    # Gigapascal
 grav_metric = 9.81 * m/sec**2
 
-steel_E = 210 * GPa
-
 print('Basic units are: \n \t Force: kN; \n \t Length: m; \n \t Time: sec.')
 print('')
 
@@ -155,19 +153,13 @@ for val in unique_ys:
 
 
 # ============================================================================
-# Load in AISC steel section database
+# Load in New Zealand steel section database
 # ============================================================================
-steel_data_US = pd.read_excel('../../../aisc-shapes-database-v16.0.xlsx', sheet_name='Database v16.0',
-                               usecols='A, C,E:G,L,Q,T,AG,AJ,AM:AT,AX,CD', index_col='AISC_Manual_Label')
+nzs_beams = pd.read_excel('../../../nzs_steel_database.xlsx', sheet_name='Beams',
+                               index_col='Designation')
 
-steel_data_metric = pd.read_excel('../../../aisc-shapes-database-v16.0.xlsx', sheet_name='Database v16.0',
-                               usecols='A, C,CH:CK,CP,CU,CX,DK,DN,DQ:DX,EB,FH', index_col='AISC_Manual_Label')
-
-# Select only W sections from database
-section_filter = steel_data_US['Type'] == 'W'
-
-steel_database_US = steel_data_US[section_filter]
-steel_database_metric = steel_data_metric[section_filter]
+nzs_cols = pd.read_excel('../../../nzs_steel_database.xlsx', sheet_name='Columns',
+                               index_col='Designation')
 
 # ============================================================================
 # Define shell properties for floor diaphragm
@@ -183,6 +175,10 @@ fiber_thick = slab_thick / 3
 shell_E =  26000 * MPa # Modulus of concrete
 shell_nu = 0.2  # Poisson's ratio
 
+# ============================================================================
+# Define generic steel properties
+# ============================================================================
+steel_E = 210 * GPa
 
 # ============================================================================
 # Define rigid material for beam-column joints elements in panel zone region
@@ -195,6 +191,29 @@ pzone_transf_tag_col = 100
 pzone_transf_tag_bm_x = 200
 pzone_transf_tag_bm_y = 300
 
+
+def get_plastic_sec_mod(mom_inertiaX):
+
+    plastic_sec_mod = 3.2511 * mom_inertiaX + 492.7
+
+    return plastic_sec_mod
+
+
+def get_mom_inertiaY(mom_inertiaX):
+
+    mom_inertiaY = 0.0342 * mom_inertiaX + 4.6305
+
+    return mom_inertiaY
+
+
+def get_polar_mom_inertia(mom_inertiaY):
+
+    polar_mom_inertia = 39.136 * mom_inertiaY - 152.24
+
+    return polar_mom_inertia
+
+
+
 # ============================================================================
 # Define beam properties
 # ============================================================================
@@ -202,28 +221,33 @@ bm_nu = 0.28  # Poisson's ratio for steel
 bm_E = steel_E
 bm_G = bm_E / (2*(1 + bm_nu))
 
-# The geometric properties of the beams will be defined using a W24x68 (metric W610x101)
-smf_beam_prop = steel_database_metric.loc['W24X68'].copy()
-bm_d = smf_beam_prop['d.1'] * mm
-bm_A = smf_beam_prop['A.1'] * mm**2
-bm_Iy = smf_beam_prop['Iy.1'] * 1E6 * mm**4   # weak axis
-bm_Iz = smf_beam_prop['Ix.1'] * 1E6 * mm**4   # strong axis
-bm_J = smf_beam_prop['J.1'] * 1E3 * mm**4
+# Initialize array of possible values for beam Ix
+bm_mom_inertia_strong = np.array(list(nzs_beams['Ix']))
+
+# The geometric properties of the beams will be defined using a 800WB168
+smf_beam_prop = nzs_beams.loc['800WB168'].copy()
 
 bm_transf_tag_x = 3  # Beams oriented in Global-X direction
 bm_transf_tag_y = 4  # Beams oriented in Global-Y direction
 
-bm_prop_flr_1 = [bm_d, bm_A, bm_E, bm_G, bm_Iy, bm_Iz, bm_J, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
-bm_prop_flr_2 = [bm_d, bm_A, bm_E, bm_G, bm_Iy, bm_Iz, bm_J, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
-bm_prop_flr_3 = [bm_d, bm_A, bm_E, bm_G, bm_Iy, bm_Iz, bm_J, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
-bm_prop_flr_4 = [bm_d, bm_A, bm_E, bm_G, bm_Iy, bm_Iz, bm_J, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
-bm_prop_flr_5 = [bm_d, bm_A, bm_E, bm_G, bm_Iy, bm_Iz, bm_J, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
-bm_prop_flr_6 = [bm_d, bm_A, bm_E, bm_G, bm_Iy, bm_Iz, bm_J, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
-bm_prop_flr_7 = [bm_d, bm_A, bm_E, bm_G, bm_Iy, bm_Iz, bm_J, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
-bm_prop_flr_8 = [bm_d, bm_A, bm_E, bm_G, bm_Iy, bm_Iz, bm_J, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
-bm_prop_flr_9 = [bm_d, bm_A, bm_E, bm_G, bm_Iy, bm_Iz, bm_J, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
-bm_prop_flr_10 = [bm_d, bm_A, bm_E, bm_G, bm_Iy, bm_Iz, bm_J, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
-bm_prop_flr_11 = [bm_d, bm_A, bm_E, bm_G, bm_Iy, bm_Iz, bm_J, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
+base_Ix = smf_beam_prop['Ix']  # No need to multiply by 'mm' or '1E6'
+# bm_Ix_modif = [1, 1, 1, 1, 1]
+bm_Ix_modif = [1, 0.8, 0.6, 0.4, 0.2]
+
+bm_sect_flr_1 = nzs_beams.loc[nzs_beams.index[nzs_beams['Ix'] >= bm_Ix_modif[0] * base_Ix].tolist()[-1]]
+bm_sect_flr_2_to_4 = nzs_beams.loc[nzs_beams.index[nzs_beams['Ix'] >= bm_Ix_modif[1] * base_Ix].tolist()[-1]]
+bm_sect_flr_5_to_7 = nzs_beams.loc[nzs_beams.index[nzs_beams['Ix'] >= bm_Ix_modif[2] * base_Ix].tolist()[-1]]
+bm_sect_flr_8_to_10 = nzs_beams.loc[nzs_beams.index[nzs_beams['Ix'] >= bm_Ix_modif[3] * base_Ix].tolist()[-1]]
+bm_sect_flr_11 = nzs_beams.loc[nzs_beams.index[nzs_beams['Ix'] >= bm_Ix_modif[4] * base_Ix].tolist()[-1]]
+
+# Assume linear relationship
+# Base Ix & slope
+
+bm_prop_flr_1 = [bm_sect_flr_1, bm_E, bm_G, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
+bm_prop_flr_2_to_4 = [bm_sect_flr_2_to_4, bm_E, bm_G, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
+bm_prop_flr_5_to_7 = [bm_sect_flr_5_to_7, bm_E, bm_G, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
+bm_prop_flr_8_to_10 = [bm_sect_flr_8_to_10, bm_E, bm_G, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
+bm_prop_flr_11 = [bm_sect_flr_11, bm_E, bm_G, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
 
 # ============================================================================
 # Define column properties
@@ -232,48 +256,22 @@ col_nu = 0.28  # Poisson's ratio for steel
 col_E = steel_E
 col_G = col_E / (2*(1 + col_nu))
 
-# The geometric properties of the columns for the East-West SMF will be defined using a W14x132 (metric W360x196)
-smf_col_EW_prop = steel_database_metric.loc['W14X132'].copy()
-col_d = smf_col_EW_prop['d.1'] * mm
-col_A_EW = smf_col_EW_prop['A.1'] * mm**2
-col_Iy_EW = smf_col_EW_prop['Iy.1'] * 1E6 * mm**4   # weak Iyy
-col_Iz_EW = smf_col_EW_prop['Ix.1'] * 1E6 * mm**4   # strong Ixx
-col_J_EW = smf_col_EW_prop['J.1'] * 1E3 * mm**4
-
 col_transf_tag_EW = 1
-
-col_EW_prop_flr_1 = [col_d, col_A_EW, col_G, col_Iy_EW, col_Iz_EW, col_J_EW, col_E, col_transf_tag_EW]
-col_EW_prop_flr_2 = [col_d, col_A_EW, col_G, col_Iy_EW, col_Iz_EW, col_J_EW, col_E, col_transf_tag_EW]
-col_EW_prop_flr_3 = [col_d, col_A_EW, col_G, col_Iy_EW, col_Iz_EW, col_J_EW, col_E, col_transf_tag_EW]
-col_EW_prop_flr_4 = [col_d, col_A_EW, col_G, col_Iy_EW, col_Iz_EW, col_J_EW, col_E, col_transf_tag_EW]
-col_EW_prop_flr_5 = [col_d, col_A_EW, col_G, col_Iy_EW, col_Iz_EW, col_J_EW, col_E, col_transf_tag_EW]
-col_EW_prop_flr_6 = [col_d, col_A_EW, col_G, col_Iy_EW, col_Iz_EW, col_J_EW, col_E, col_transf_tag_EW]
-col_EW_prop_flr_7 = [col_d, col_A_EW, col_G, col_Iy_EW, col_Iz_EW, col_J_EW, col_E, col_transf_tag_EW]
-col_EW_prop_flr_8 = [col_d, col_A_EW, col_G, col_Iy_EW, col_Iz_EW, col_J_EW, col_E, col_transf_tag_EW]
-col_EW_prop_flr_9 = [col_d, col_A_EW, col_G, col_Iy_EW, col_Iz_EW, col_J_EW, col_E, col_transf_tag_EW]
-col_EW_prop_flr_10 = [col_d, col_A_EW, col_G, col_Iy_EW, col_Iz_EW, col_J_EW, col_E, col_transf_tag_EW]
-col_EW_prop_flr_11 = [col_d, col_A_EW, col_G, col_Iy_EW, col_Iz_EW, col_J_EW, col_E, col_transf_tag_EW]
-
-# The geometric properties of the columns for the North-South SMF will be defined using a W14x132 (metric W360x196)
-smf_col_NS_prop = steel_database_metric.loc['W14X132'].copy()
-col_A_NS = smf_col_NS_prop['A.1'] * mm**2
-col_Iy_NS = smf_col_NS_prop['Ix.1'] * 1E6 * mm**4   # strong Ixx
-col_Iz_NS = smf_col_NS_prop['Iy.1'] * 1E6 * mm**4   # weak Iyy
-col_J_NS = smf_col_NS_prop['J.1'] * 1E3 * mm**4
-
 col_transf_tag_NS = 2
 
-col_NS_prop_flr_1 = [col_d, col_A_NS, col_G, col_Iy_NS, col_Iz_NS, col_J_NS, col_E, col_transf_tag_NS, pzone_transf_tag_col]
-col_NS_prop_flr_2 = [col_d, col_A_NS, col_G, col_Iy_NS, col_Iz_NS, col_J_NS, col_E, col_transf_tag_NS, pzone_transf_tag_col]
-col_NS_prop_flr_3 = [col_d, col_A_NS, col_G, col_Iy_NS, col_Iz_NS, col_J_NS, col_E, col_transf_tag_NS, pzone_transf_tag_col]
-col_NS_prop_flr_4 = [col_d, col_A_NS, col_G, col_Iy_NS, col_Iz_NS, col_J_NS, col_E, col_transf_tag_NS, pzone_transf_tag_col]
-col_NS_prop_flr_5 = [col_d, col_A_NS, col_G, col_Iy_NS, col_Iz_NS, col_J_NS, col_E, col_transf_tag_NS, pzone_transf_tag_col]
-col_NS_prop_flr_6 = [col_d, col_A_NS, col_G, col_Iy_NS, col_Iz_NS, col_J_NS, col_E, col_transf_tag_NS, pzone_transf_tag_col]
-col_NS_prop_flr_7 = [col_d, col_A_NS, col_G, col_Iy_NS, col_Iz_NS, col_J_NS, col_E, col_transf_tag_NS, pzone_transf_tag_col]
-col_NS_prop_flr_8 = [col_d, col_A_NS, col_G, col_Iy_NS, col_Iz_NS, col_J_NS, col_E, col_transf_tag_NS, pzone_transf_tag_col]
-col_NS_prop_flr_9 = [col_d, col_A_NS, col_G, col_Iy_NS, col_Iz_NS, col_J_NS, col_E, col_transf_tag_NS, pzone_transf_tag_col]
-col_NS_prop_flr_10 = [col_d, col_A_NS, col_G, col_Iy_NS, col_Iz_NS, col_J_NS, col_E, col_transf_tag_NS, pzone_transf_tag_col]
-col_NS_prop_flr_11 = [col_d, col_A_NS, col_G, col_Iy_NS, col_Iz_NS, col_J_NS, col_E, col_transf_tag_NS, pzone_transf_tag_col]
+col_beam_mom_ratio = 1.25
+
+col_sect_flr_1 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= col_beam_mom_ratio * bm_sect_flr_1['Zx']].tolist()[-1]]
+col_sect_flr_2_to_4 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= col_beam_mom_ratio * bm_sect_flr_2_to_4['Zx']].tolist()[-1]]
+col_sect_flr_5_to_7 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= col_beam_mom_ratio * bm_sect_flr_5_to_7['Zx']].tolist()[-1]]
+col_sect_8_to_10 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= col_beam_mom_ratio * bm_sect_flr_8_to_10['Zx']].tolist()[-1]]
+col_sect_flr_11 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= col_beam_mom_ratio * bm_sect_flr_11['Zx']].tolist()[-1]]
+
+col_prop_flr_1 = [col_sect_flr_1, col_E, col_G, col_transf_tag_EW, col_transf_tag_NS, pzone_transf_tag_col]
+col_prop_flr_2_to_4 = [col_sect_flr_2_to_4, col_E, col_G, col_transf_tag_EW, col_transf_tag_NS, pzone_transf_tag_col]
+col_prop_5_to_7 = [col_sect_flr_5_to_7, col_E, col_G, col_transf_tag_EW, col_transf_tag_NS, pzone_transf_tag_col]
+col_prop_8_to_10 = [col_sect_8_to_10, col_E, col_G, col_transf_tag_EW, col_transf_tag_NS, pzone_transf_tag_col]
+col_prop_flr_11 = [col_sect_flr_11, col_E, col_G, col_transf_tag_EW, col_transf_tag_NS, pzone_transf_tag_col]
 
 
 # ============================================================================
@@ -287,7 +285,7 @@ total_floor_mass = {}
 # Define function to create a floor
 # ============================================================================
 
-def create_floor(elev, floor_num, beam_prop=None, col_prop_EW=None, col_prop_NS=None, floor_label='',):
+def create_floor(elev, floor_num, beam_prop=None, col_prop=None, floor_label='',):
 
     node_compile = []  # Store node numbers grouped according to their y-coordinates
 
@@ -301,7 +299,7 @@ def create_floor(elev, floor_num, beam_prop=None, col_prop_EW=None, col_prop_NS=
 
         for x_val in x_vals:
 
-            if floor_num == '00':  # Only create bottom floor nodes at the location of columns
+            if floor_num == '00': # Only create bottom floor nodes at the location of columns
 
                 # Check if the current node is at the location of a column
                 if (smf_coords_df == [x_val, unique_ys[jj]]).all(1).any():
@@ -331,7 +329,7 @@ def create_floor(elev, floor_num, beam_prop=None, col_prop_EW=None, col_prop_NS=
                     bm_col_joint_node_top = int(str(node_num) + '1')
                     bm_col_joint_node_bot = int(str(node_num) + '2')
 
-                    pz_d = beam_prop[0] / 2  # Half the depth of panel zone region
+                    pz_d = beam_prop[0]['d'] / 2 * mm # Half the depth of panel zone region
                     ops.node(bm_col_joint_node_bot, x_val, unique_ys[jj], elev - pz_d)
 
                     if floor_num != '11':  # No panel zone above roof level
@@ -396,8 +394,8 @@ def create_floor(elev, floor_num, beam_prop=None, col_prop_EW=None, col_prop_NS=
         com_node_tags[floor_num] = com_node
 
         # Create columns & beams
-        create_columns(floor_num, smf_node_tags, col_prop_EW, col_prop_NS, beam_prop)
-        create_beams(floor_num, elev, com_node, smf_node_tags, smf_coords_df, beam_prop, col_prop_NS)
+        create_columns(floor_num, smf_node_tags, col_prop, beam_prop)
+        create_beams(floor_num, elev, com_node, smf_node_tags, smf_coords_df, beam_prop, col_prop[0])
 
     print('Floor ' + floor_num + ' created')
 
@@ -432,19 +430,19 @@ def build_model():
 
     # Create all floors of building
     print('Now creating SSMF model... \n')
-    create_floor(ground_flr, '00')
-    create_floor(flr1, '01', bm_prop_flr_1, col_EW_prop_flr_1, col_NS_prop_flr_1, '1st')
-    create_floor(flr2, '02', bm_prop_flr_2, col_EW_prop_flr_2, col_NS_prop_flr_2, '2nd')
-    create_floor(flr3, '03', bm_prop_flr_3, col_EW_prop_flr_3, col_NS_prop_flr_3, '3rd')
-    create_floor(flr4, '04', bm_prop_flr_4, col_EW_prop_flr_4, col_NS_prop_flr_4, '4th')
-    create_floor(flr5, '05', bm_prop_flr_5, col_EW_prop_flr_5, col_NS_prop_flr_5, '5th')
-    create_floor(flr6, '06', bm_prop_flr_6, col_EW_prop_flr_6, col_NS_prop_flr_6, '6th')
-    create_floor(flr7, '07', bm_prop_flr_7, col_EW_prop_flr_7, col_NS_prop_flr_7, '7th')
-    create_floor(flr8, '08', bm_prop_flr_8, col_EW_prop_flr_8, col_NS_prop_flr_8, '8th')
-    create_floor(flr9, '09', bm_prop_flr_9, col_EW_prop_flr_9, col_NS_prop_flr_9, '9th')
-    create_floor(flr10, '10', bm_prop_flr_10, col_EW_prop_flr_10, col_NS_prop_flr_10, '10th')
-    create_floor(roof_flr, '11', bm_prop_flr_11, col_EW_prop_flr_11, col_NS_prop_flr_11, 'Roof')
 
+    create_floor(ground_flr, '00')
+    create_floor(flr1, '01', bm_prop_flr_1, col_prop_flr_1, '1st')
+    create_floor(flr2, '02', bm_prop_flr_2_to_4, col_prop_flr_2_to_4, '2nd')
+    create_floor(flr3, '03', bm_prop_flr_2_to_4, col_prop_flr_2_to_4, '3rd')
+    create_floor(flr4, '04', bm_prop_flr_2_to_4, col_prop_flr_2_to_4, '4th')
+    create_floor(flr5, '05', bm_prop_flr_5_to_7, col_prop_5_to_7, '5th')
+    create_floor(flr6, '06', bm_prop_flr_5_to_7, col_prop_5_to_7, '6th')
+    create_floor(flr7, '07', bm_prop_flr_5_to_7, col_prop_5_to_7, '7th')
+    create_floor(flr8, '08', bm_prop_flr_8_to_10, col_prop_8_to_10, '8th')
+    create_floor(flr9, '09', bm_prop_flr_8_to_10, col_prop_8_to_10, '9th')
+    create_floor(flr10, '10', bm_prop_flr_8_to_10, col_prop_8_to_10, '10th')
+    create_floor(roof_flr, '11', bm_prop_flr_11, col_prop_flr_11, 'Roof')
 
     # ============================================================================
     # Create regions for SMF beams based on floor
@@ -610,7 +608,7 @@ if mrsa:
         ops.recorder('Node', '-file', mrsa_res_folder + 'lowerLeftCornerDisp.txt', '-node', *list(smf_node_tags.loc['col1'])[1:], '-dof', direcs[ii], 'disp')
         ops.recorder('Node', '-file', mrsa_res_folder + 'middleLeftCornerDisp.txt', '-node', *list(smf_node_tags.loc['col13'])[1:], '-dof', direcs[ii], 'disp')
         ops.recorder('Node', '-file', mrsa_res_folder + 'middleCenterCornerDisp.txt', '-node', *list(smf_node_tags.loc['col15'])[1:], '-dof', direcs[ii], 'disp')
-        ops.recorder('Node', '-file', mrsa_res_folder + 'upperCenterCornerDisp.txt', '-node', *list(smf_node_tags.loc['col21'])[1:], '-dof', direcs[ii], 'disp')
+        ops.recorder('Node', '-file', mrsa_res_folder + 'upperLeftCornerDisp.txt', '-node', *list(smf_node_tags.loc['col21'])[1:], '-dof', direcs[ii], 'disp')
         ops.recorder('Node', '-file', mrsa_res_folder + 'upperRightCornerDisp.txt', '-node', *list(smf_node_tags.loc['col23'])[1:], '-dof', direcs[ii], 'disp')
         ops.recorder('Node', '-file', mrsa_res_folder + 'lowerRightCornerDisp.txt', '-node', *list(smf_node_tags.loc['col5'])[1:], '-dof', direcs[ii], 'disp')
 
@@ -632,6 +630,7 @@ ops.wipe()
 print('\nMRSA completed.')
 print('======================================================')
 
+
 # ============================================================================
 # Compute Torsional Irregularity Ratio (TIR)
 # ============================================================================
@@ -640,37 +639,35 @@ print('======================================================')
 lower_left_corner_disp = modal_combo(np.loadtxt('./mrsa_results/dirX/lowerLeftCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
 mid_left_corner_disp = modal_combo(np.loadtxt('./mrsa_results/dirX/middleLeftCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
 mid_center_corner_disp = modal_combo(np.loadtxt('./mrsa_results/dirX/middleCenterCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
-upper_center_corner_disp = modal_combo(np.loadtxt('./mrsa_results/dirX/upperCenterCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
+upper_left_corner_disp = modal_combo(np.loadtxt('./mrsa_results/dirX/upperLeftCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
 upper_right_corner_disp = modal_combo(np.loadtxt('./mrsa_results/dirX/upperRightCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
 lower_right_corner_disp = modal_combo(np.loadtxt('./mrsa_results/dirX/lowerRightCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
 
-ax1 = np.maximum(lower_left_corner_disp, mid_left_corner_disp) / (0.5*(lower_left_corner_disp + mid_left_corner_disp))
-ax2 = np.maximum(mid_center_corner_disp, upper_center_corner_disp) / (0.5*(mid_center_corner_disp + upper_center_corner_disp))
-ax3 = np.maximum(upper_right_corner_disp, lower_right_corner_disp) / (0.5*(upper_right_corner_disp + lower_right_corner_disp))
-# b = np.maximum(mid_left_corner_disp, mid_center_corner_disp) / (0.5*(mid_left_corner_disp + mid_center_corner_disp))
-# d = np.maximum(upper_center_corner_disp, upper_right_corner_disp) / (0.5*(upper_center_corner_disp + upper_right_corner_disp))
-# f = np.maximum(lower_left_corner_disp, lower_right_corner_disp) / (0.5*(lower_left_corner_disp + lower_right_corner_disp))
+tir_x_edgeA = np.maximum(lower_left_corner_disp, mid_left_corner_disp) / (0.5*(lower_left_corner_disp + mid_left_corner_disp))
+tir_x_edgeB = np.maximum(mid_left_corner_disp, mid_center_corner_disp) / (0.5*(mid_left_corner_disp + mid_center_corner_disp))
+tir_x_edgeC = np.maximum(mid_center_corner_disp, upper_left_corner_disp) / (0.5*(mid_center_corner_disp + upper_left_corner_disp))
+tir_x_edgeD = np.maximum(upper_left_corner_disp, upper_right_corner_disp) / (0.5*(upper_left_corner_disp + upper_right_corner_disp))
+tir_x_edgeE = np.maximum(upper_right_corner_disp, lower_right_corner_disp) / (0.5*(upper_right_corner_disp + lower_right_corner_disp))
+tir_x_edgeF = np.maximum(lower_left_corner_disp, lower_right_corner_disp) / (0.5*(lower_left_corner_disp + lower_right_corner_disp))
 
 # ===== MRSA - Y
 lower_left_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/lowerLeftCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
 mid_left_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/middleLeftCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
 mid_center_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/middleCenterCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
-upper_center_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/upperCenterCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
+upper_left_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/upperLeftCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
 upper_right_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/upperRightCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
 lower_right_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/lowerRightCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
 
+tir_y_edgeA = np.maximum(lower_left_corner_dispY, mid_left_corner_dispY) / (0.5*(lower_left_corner_dispY + mid_left_corner_dispY))
+tir_y_edgeB = np.maximum(mid_left_corner_dispY, mid_center_corner_dispY) / (0.5*(mid_left_corner_dispY + mid_center_corner_dispY))
+tir_y_edgeC = np.maximum(mid_center_corner_dispY, upper_left_corner_dispY) / (0.5*(mid_center_corner_dispY + upper_left_corner_dispY))
+tir_y_edgeD = np.maximum(upper_left_corner_dispY, upper_right_corner_dispY) / (0.5*(upper_left_corner_dispY + upper_right_corner_dispY))
+tir_y_edgeE = np.maximum(upper_right_corner_dispY, lower_right_corner_dispY) / (0.5*(upper_right_corner_dispY + lower_right_corner_dispY))
+tir_y_edgeF = np.maximum(lower_left_corner_dispY, lower_right_corner_dispY) / (0.5*(lower_left_corner_dispY + lower_right_corner_dispY))
 
-ay1 = np.maximum(mid_left_corner_dispY, mid_center_corner_dispY) / (0.5*(mid_left_corner_dispY + mid_center_corner_dispY))
-ay2 = np.maximum(upper_center_corner_dispY, upper_right_corner_dispY) / (0.5*(upper_center_corner_dispY + upper_right_corner_dispY))
-ay3 = np.maximum(lower_left_corner_dispY, lower_right_corner_dispY) / (0.5*(lower_left_corner_dispY + lower_right_corner_dispY))
-# a_y = np.maximum(lower_left_corner_dispY, mid_left_corner_dispY) / (0.5*(lower_left_corner_dispY + mid_left_corner_dispY))
-# c_y = np.maximum(mid_center_corner_dispY, upper_center_corner_dispY) / (0.5*(mid_center_corner_dispY + upper_center_corner_dispY))
-# e_y = np.maximum(upper_right_corner_dispY, lower_right_corner_dispY) / (0.5*(upper_right_corner_dispY + lower_right_corner_dispY))
-
-
-# # ============================================================================
-# # Post-process MRSA results
-# # ============================================================================
+# ============================================================================
+# Post-process MRSA results
+# ============================================================================
 beam_demands_mrsa_X = process_beam_resp('./mrsa_results/dirX/', lambda_list, damping_ratio, num_modes)
 beam_demands_mrsa_Y = process_beam_resp('./mrsa_results/dirY/', lambda_list, damping_ratio, num_modes)
 
@@ -721,6 +718,7 @@ story_driftX *=  (ductility_factor * pdelta_fac * drift_modif_fac)
 story_driftY *=  (ductility_factor * pdelta_fac * drift_modif_fac)
 
 max_story_drift = max(story_driftX.max(), story_driftY.max())
+print('\nMaximum story drift: {:.2f}%'.format(max_story_drift))
 
 # CHECK DRIFT REQUIREMENTS
 drift_ok = max_story_drift < 2.5  # MAximum story drift limit = 2.5%
@@ -728,7 +726,7 @@ drift_ok = max_story_drift < 2.5  # MAximum story drift limit = 2.5%
 # CHECK STABILITY REQUIREMENTS (P-DELTA)
 
 # CHECK STRENGTH REQUIREMENTS
-
+"""
 '========================================================================='
 'NEED TO SATISFY DRIFT, STABILITY & STRENGTH REQUIREMENTS BEFORE DOING THIS'
 '========================================================================='
@@ -751,6 +749,7 @@ torsional_mom_y = elf_force_distrib * accid_ecc_x
 torsional_direc = ['X', 'Y']
 torsional_sign = [1, -1]
 torsional_folder = ['positive', 'negative']
+
 
 # Perform static analysis for loading in X & Y direction
 for ii in range(len(torsional_direc)):
@@ -826,6 +825,6 @@ for ii in range(len(torsional_direc)):
         print('=============================================================')
 
 print('\nStatic analysis for accidental torsion completed...')
-
+"""
 
 
