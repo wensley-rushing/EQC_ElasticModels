@@ -24,6 +24,7 @@ from helper_functions.get_beam_demands import process_beam_resp
 from helper_functions.get_story_drift import compute_story_drifts
 from helper_functions.cqc_modal_combo import modal_combo
 from helper_functions.elf_new_zealand import nz_horiz_seismic_shear, nz_horiz_force_distribution
+from helper_functions.get_spectral_shape_factor import spectral_shape_fac
 
 
 # Define Units
@@ -667,7 +668,7 @@ mrsa_base_shearY = modal_combo(np.loadtxt('./mrsa_results/dirY/baseShearY.txt'),
 # ============================================================================
 # Perform ELF
 # ============================================================================
-spectral_shape_factor = 0.595
+spectral_shape_factor = spectral_shape_fac(periods[0])
 hazard_factor = 0.13
 return_per_factor_sls = 0.25
 return_per_factor_uls = 1.3

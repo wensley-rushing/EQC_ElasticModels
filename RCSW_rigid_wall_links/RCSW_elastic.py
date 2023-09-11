@@ -19,7 +19,8 @@ sys.path.append('../')
 from helper_functions.create_floor_shell import refine_mesh
 from helper_functions.create_floor_shell import create_shell
 from helper_functions.cqc_modal_combo import modal_combo
-
+from helper_functions.elf_new_zealand import nz_horiz_seismic_shear, nz_horiz_force_distribution
+from helper_functions.get_spectral_shape_factor import spectral_shape_fac
 
 # Define Units
 sec = 1
@@ -61,6 +62,9 @@ flr8 = flr7 + typ_flr_height
 flr9 = flr8 + typ_flr_height
 flr10 = flr9 + typ_flr_height
 roof_flr = flr10 + typ_flr_height
+
+story_heights = np.array([flr1, typ_flr_height, typ_flr_height, typ_flr_height, typ_flr_height, typ_flr_height,
+                 typ_flr_height, typ_flr_height, typ_flr_height, typ_flr_height, typ_flr_height]) # Story heights from Floor 1 to Roof
 
 # Generic material properties
 conc_rho = 24 * kN / m**3 # Density of concrete
@@ -867,9 +871,26 @@ tir_y_edgeF = np.maximum(lower_left_corner_dispY, lower_right_corner_dispY) / (0
 # ============================================================================
 # Post-process MRSA results
 # ============================================================================
-
+mrsa_base_shearX = modal_combo(np.loadtxt('./mrsa_results/dirX/baseShearX.txt'), lambda_list, damping_ratio, num_modes).sum()
+mrsa_base_shearY = modal_combo(np.loadtxt('./mrsa_results/dirY/baseShearY.txt'), lambda_list, damping_ratio, num_modes).sum()
 
 # ============================================================================
 # Perform ELF
 # ============================================================================
+spectral_shape_factor = spectral_shape_fac(periods[0])
+hazard_factor = 0.13
+return_per_factor_sls = 0.25
+return_per_factor_uls = 1.3
+fault_factor = 1.0
+perform_factor = 0.7
+ductility_factor = 1.25  # RCSW
+story_weights = np.array(list(total_floor_mass.values())) * grav_metric
+seismic_weight = story_weights.sum()
 
+elf_base_shear = nz_horiz_seismic_shear(spectral_shape_factor, hazard_factor,
+                                        return_per_factor_sls, return_per_factor_uls,
+                                        fault_factor, perform_factor, ductility_factor,
+                                        seismic_weight)
+
+elf_force_distrib = nz_horiz_force_distribution(elf_base_shear, story_weights,
+                                                np.cumsum(story_heights))
