@@ -944,3 +944,98 @@ if theta_ok:
     print('Stability requirements satisfied.')
 else:
     print('Stability requirements NOT satisfied.')
+
+
+# ============================================================================
+# Perform static analysis for accidental torsional moment
+# ============================================================================
+floor_dimen_x = 29.410 * m
+floor_dimen_y = 31.025 * m
+
+accid_ecc_x = 0.1 * floor_dimen_x
+accid_ecc_y = 0.1 * floor_dimen_y
+
+torsional_mom_x = elf_force_distrib * accid_ecc_y
+torsional_mom_y = elf_force_distrib * accid_ecc_x
+
+# AMPLIFY TORSIONAL MOMENT IF REQUIRED BY CODE
+# New Zealand does not require amplification of accidental torsional moment
+
+torsional_direc = ['X', 'Y']
+torsional_sign = [1, -1]
+torsional_folder = ['positive', 'negative']
+
+# """
+# Perform static analysis for loading in X & Y direction
+for ii in range(len(torsional_direc)):
+
+    # For each direction, account for positive & negative loading
+    for jj in range(len(torsional_sign)):
+        print('\nNow commencing static analysis using torsional moments for ' + torsional_folder[jj] + ' ' + torsional_direc[ii] + ' direction.')
+        build_model()
+
+        print('\nModel generated...')
+
+        # Impose torsional moments at COMs
+        com_nodes = list(com_node_tags.values())
+
+        # Assign torsional moments
+        ts_tag = 20000
+        pattern_tag = 20000
+
+        ops.timeSeries('Constant', ts_tag)
+        ops.pattern('Plain', pattern_tag, ts_tag)
+
+        # Loop through each COM node and apply torsional moment
+        for kk in range(len(com_nodes)):
+            if ii == 1:  # Torsional moment applied about x-axis
+                ops.load(com_nodes[kk], 0., 0., 0., torsional_mom_x[kk] * torsional_sign[jj], 0., 0.)
+
+            else:  # Torsional moment applied about y-axis
+                ops.load(com_nodes[kk], 0., 0., 0., 0., torsional_mom_y[kk] * torsional_sign[jj], 0.)
+
+
+        # Create directory to save results
+        accident_torsion_res_folder = './accidental_torsion_results/' + torsional_folder[jj] + torsional_direc[ii] + '/'
+        os.makedirs(accident_torsion_res_folder, exist_ok=True)
+
+        # Create recorder for beam-response in direction of static loading
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor01_beamResp.txt', '-precision', 16, '-region', 201, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor02_beamResp.txt', '-precision', 16, '-region', 202, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor03_beamResp.txt', '-precision', 16, '-region', 203, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor04_beamResp.txt', '-precision', 16, '-region', 204, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor05_beamResp.txt', '-precision', 16, '-region', 205, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor06_beamResp.txt', '-precision', 16, '-region', 206, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor07_beamResp.txt', '-precision', 16, '-region', 207, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor08_beamResp.txt', '-precision', 16, '-region', 208, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor09_beamResp.txt', '-precision', 16, '-region', 209, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor10_beamResp.txt', '-precision', 16, '-region', 210, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor11_beamResp.txt', '-precision', 16, '-region', 211, 'force')
+
+        # Base shear
+        ops.recorder('Node', '-file', accident_torsion_res_folder + 'baseShearX.txt', '-node',
+                      *lfre_node_tags['00'].tolist(), '-dof', 1, 2, 4, 5, 'reaction')  # Fx, Fy, Mx, My
+
+        # Perform static analysis
+        num_step_sWgt = 1     # Set weight increments
+
+        ops.constraints('Penalty', 1.0e17, 1.0e17)
+        ops.test('NormDispIncr', 1e-6, 100, 0)
+        ops.algorithm('KrylovNewton')
+        ops.numberer('RCM')
+        ops.system('ProfileSPD')
+        ops.integrator('LoadControl', 1, 1, 1, 1)
+        ops.analysis('Static')
+
+        ops.analyze(num_step_sWgt)
+
+        # Shut down recorders
+        ops.remove('recorders')
+
+        # Clear model
+        ops.wipe()
+
+        print('=============================================================')
+
+print('\nStatic analysis for accidental torsion completed...')
+# """
