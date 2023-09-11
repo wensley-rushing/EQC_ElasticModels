@@ -191,7 +191,7 @@ Rows are arranged from Wall 1 to Wall 10 as labelled in drawings.
 wall_prop = np.array([[7.550, .300],
                       [7.305, .300],
                       [7.775, .300],
-                      [3.405, .400],
+                      [3.405, .300],
                       [7.550, .300],
                       [7.405, .300],
                       [4.895, .300],
@@ -820,9 +820,6 @@ if mrsa:
 
         # Create recorders to store nodal displacements at the building edges
         ops.recorder('Node', '-file', mrsa_res_folder + 'lowerLeftCornerDisp.txt', '-node', *list(wall_ends_node_tags.loc['wall1_l'])[1:], '-dof', direcs[ii], 'disp')
-        # ops.recorder('Node', '-file', mrsa_res_folder + 'middleLeftCornerDisp.txt', '-node', *list(wall_ends_node_tags.loc['wall5_r'])[1:], '-dof', direcs[ii], 'disp')
-        # ops.recorder('Node', '-file', mrsa_res_folder + 'middleCenterCornerDisp.txt', '-node', *list(wall_ends_node_tags.loc['wall8_l'])[1:], '-dof', direcs[ii], 'disp')  # Not the exact node
-        # ops.recorder('Node', '-file', mrsa_res_folder + 'upperLeftCornerDisp.txt', '-node', *list(wall_ends_node_tags.loc['wall9_l'])[1:], '-dof', direcs[ii], 'disp')
         ops.recorder('Node', '-file', mrsa_res_folder + 'upperRightCornerDisp.txt', '-node', *list(wall_ends_node_tags.loc['wall10_r'])[1:], '-dof', direcs[ii], 'disp')
         ops.recorder('Node', '-file', mrsa_res_folder + 'lowerRightCornerDisp.txt', '-node', *list(lfre_node_tags.loc['col3'])[1:], '-dof', direcs[ii], 'disp')
 
@@ -856,16 +853,16 @@ lower_left_corner_dispX = modal_combo(np.loadtxt('./mrsa_results/dirX/lowerLeftC
 upper_right_corner_dispX = modal_combo(np.loadtxt('./mrsa_results/dirX/upperRightCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
 lower_right_corner_dispX = modal_combo(np.loadtxt('./mrsa_results/dirX/lowerRightCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
 
-tir_x_right_edge = np.maximum(upper_right_corner_dispX, lower_right_corner_dispX) / (0.5*(upper_right_corner_dispX + lower_right_corner_dispX))
-tir_x_bottom_edge = np.maximum(lower_left_corner_dispX, lower_right_corner_dispX) / (0.5*(lower_left_corner_dispX + lower_right_corner_dispX))
+tir_x_edgeE = np.maximum(upper_right_corner_dispX, lower_right_corner_dispX) / (0.5*(upper_right_corner_dispX + lower_right_corner_dispX))  # Right edge of building plan
+tir_x_edgeF = np.maximum(lower_left_corner_dispX, lower_right_corner_dispX) / (0.5*(lower_left_corner_dispX + lower_right_corner_dispX))    # Bottom edge of building plan
 
 # ===== MRSA - Y
 lower_left_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/lowerLeftCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
 upper_right_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/upperRightCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
 lower_right_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/lowerRightCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
 
-tir_y_right_edge = np.maximum(upper_right_corner_dispY, lower_right_corner_dispY) / (0.5*(upper_right_corner_dispY + lower_right_corner_dispY))
-tir_y_bottom_edge = np.maximum(lower_left_corner_dispY, lower_right_corner_dispY) / (0.5*(lower_left_corner_dispY + lower_right_corner_dispY))
+tir_y_edgeE = np.maximum(upper_right_corner_dispY, lower_right_corner_dispY) / (0.5*(upper_right_corner_dispY + lower_right_corner_dispY))  # Right edge of building plan
+tir_y_edgeF = np.maximum(lower_left_corner_dispY, lower_right_corner_dispY) / (0.5*(lower_left_corner_dispY + lower_right_corner_dispY))    # Bottom edge of building plan
 
 # ============================================================================
 # Post-process MRSA results
