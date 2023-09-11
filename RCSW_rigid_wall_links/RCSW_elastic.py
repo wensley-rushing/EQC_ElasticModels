@@ -19,6 +19,7 @@ sys.path.append('../')
 from helper_functions.create_floor_shell import refine_mesh
 from helper_functions.create_floor_shell import create_shell
 from helper_functions.cqc_modal_combo import modal_combo
+from helper_functions.get_story_drift import compute_story_drifts
 from helper_functions.elf_new_zealand import nz_horiz_seismic_shear, nz_horiz_force_distribution
 from helper_functions.get_spectral_shape_factor import spectral_shape_fac
 
@@ -894,3 +895,52 @@ elf_base_shear = nz_horiz_seismic_shear(spectral_shape_factor, hazard_factor,
 
 elf_force_distrib = nz_horiz_force_distribution(elf_base_shear, story_weights,
                                                 np.cumsum(story_heights))
+
+# Compute factors for scaling MRSA demands to ELF demands
+elf_mrsaX_scale_factor = elf_base_shear / mrsa_base_shearX
+elf_mrsaY_scale_factor = elf_base_shear / mrsa_base_shearY
+
+# Deflection amplification factors
+kp  = 0.015 + 0.0075*(ductility_factor - 1)
+kp = min(max(0.0015, kp), 0.03)
+
+pdelta_fac = (kp * seismic_weight + elf_base_shear) / elf_base_shear  # NZS 1170.5-2004: Sec 7.2.1.2 & 6.5.4.1
+
+drift_modif_fac = 1.5  # NZS 1170.5-2004: Table 7.1
+
+# Compute story drifts
+# For MRSA in x-direction
+com_dispX = np.loadtxt('./mrsa_results/dirX/COM_dispX.txt')
+story_driftX = compute_story_drifts(com_dispX, story_heights, lambda_list, damping_ratio, num_modes)
+
+# For MRSA in y-direction
+com_dispY = np.loadtxt('./mrsa_results/dirY/COM_dispY.txt')
+story_driftY = compute_story_drifts(com_dispY, story_heights, lambda_list, damping_ratio, num_modes)
+
+# Amplify drifts by required factors
+story_driftX *=  (ductility_factor * pdelta_fac * drift_modif_fac)
+story_driftY *=  (ductility_factor * pdelta_fac * drift_modif_fac)
+
+# CHECK DRIFT REQUIREMENTS
+max_story_drift = max(story_driftX.max(), story_driftY.max())
+drift_ok = max_story_drift < 2.5  # Maximum story drift limit = 2.5%  NZS 1170.5:2004 - Sect 7.5.1
+
+print('\nMaximum story drift: {:.2f}%'.format(max_story_drift))
+if drift_ok:
+    print('Story drift requirements satisfied.')
+else:
+    print('Story drift requirements NOT satisfied.')
+
+
+# CHECK STABILITY REQUIREMENTS (P-DELTA) NZS 1170.5:2004 - Sect 6.5.1
+thetaX = story_weights * 0.01 * story_driftX / (elf_force_distrib * story_heights)
+thetaY = story_weights * 0.01 * story_driftY / (elf_force_distrib * story_heights)
+
+max_theta = max(thetaX.max(), thetaY.max())
+theta_ok = max_theta < 0.3
+
+print('\nMaximum stability coefficient: {:.2f}'.format(max_theta))
+if theta_ok:
+    print('Stability requirements satisfied.')
+else:
+    print('Stability requirements NOT satisfied.')

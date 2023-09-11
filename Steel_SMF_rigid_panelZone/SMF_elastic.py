@@ -686,6 +686,9 @@ elf_base_shear = nz_horiz_seismic_shear(spectral_shape_factor, hazard_factor,
 elf_force_distrib = nz_horiz_force_distribution(elf_base_shear, story_weights,
                                                 np.cumsum(story_heights))
 
+# Compute factors for scaling MRSA demands to ELF demands
+elf_mrsaX_scale_factor = elf_base_shear / mrsa_base_shearX
+elf_mrsaY_scale_factor = elf_base_shear / mrsa_base_shearY
 
 # Deflection amplification factors
 kp  = 0.015 + 0.0075*(ductility_factor - 1)
