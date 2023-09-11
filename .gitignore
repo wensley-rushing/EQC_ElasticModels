@@ -176,3 +176,6 @@ pvd/
 
 # Mode shape animations
 modeShapeAnimations/
+
+# Optimization results folder
+optimization_results/

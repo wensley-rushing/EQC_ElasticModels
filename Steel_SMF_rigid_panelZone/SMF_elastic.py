@@ -184,36 +184,9 @@ steel_E = 210 * GPa
 # ============================================================================
 # Define rigid material for beam-column joints elements in panel zone region
 # ============================================================================
-pz_E = steel_E
-rigid_mat_tag = 100
-ops.uniaxialMaterial('Elastic', rigid_mat_tag, pz_E)
-
 pzone_transf_tag_col = 100
 pzone_transf_tag_bm_x = 200
 pzone_transf_tag_bm_y = 300
-
-
-def get_plastic_sec_mod(mom_inertiaX):
-
-    plastic_sec_mod = 3.2511 * mom_inertiaX + 492.7
-
-    return plastic_sec_mod
-
-
-def get_mom_inertiaY(mom_inertiaX):
-
-    mom_inertiaY = 0.0342 * mom_inertiaX + 4.6305
-
-    return mom_inertiaY
-
-
-def get_polar_mom_inertia(mom_inertiaY):
-
-    polar_mom_inertia = 39.136 * mom_inertiaY - 152.24
-
-    return polar_mom_inertia
-
-
 
 # ============================================================================
 # Define beam properties
@@ -222,18 +195,22 @@ bm_nu = 0.28  # Poisson's ratio for steel
 bm_E = steel_E
 bm_G = bm_E / (2*(1 + bm_nu))
 
-# Initialize array of possible values for beam Ix
-bm_mom_inertia_strong = np.array(list(nzs_beams['Ix']))
-
-# The geometric properties of the beams will be defined using a 800WB168
-smf_beam_prop = nzs_beams.loc['1000WB215'].copy()
-
 bm_transf_tag_x = 3  # Beams oriented in Global-X direction
 bm_transf_tag_y = 4  # Beams oriented in Global-Y direction
 
-base_Ix = smf_beam_prop['Ix']  # No need to multiply by 'mm' or '1E6'
+# Initialize array of possible values for beam Ix
+bm_mom_inertia_strong = np.array(list(nzs_beams['Ix']))
+
+# The geometric properties of the beams will be defined relative to the stiffness of the first floor beam
+base_Ix = 10200.21597868362  # No need to multiply by 'mm' or '1E6'
+slope_Ix_line = 0.0034565742429620294
+col_group_heights = np.array([0, 6.2, 15.5, 24.8, 31])  # Height of column groups from the 1st floor
+
+# Assume linear relationship
+# Base Ix & slope
 # bm_Ix_modif = [1, 1, 1, 1, 1]
-bm_Ix_modif = [1, 0.8, 0.6, 0.5, 0.4]
+# bm_Ix_modif = [1, 0.8, 0.6, 0.5, 0.4]
+bm_Ix_modif = 1 - slope_Ix_line*col_group_heights
 
 bm_sect_flr_1 = nzs_beams.loc[nzs_beams.index[nzs_beams['Ix'] >= bm_Ix_modif[0] * base_Ix].tolist()[-1]]
 bm_sect_flr_2_to_4 = nzs_beams.loc[nzs_beams.index[nzs_beams['Ix'] >= bm_Ix_modif[1] * base_Ix].tolist()[-1]]
@@ -241,8 +218,7 @@ bm_sect_flr_5_to_7 = nzs_beams.loc[nzs_beams.index[nzs_beams['Ix'] >= bm_Ix_modi
 bm_sect_flr_8_to_10 = nzs_beams.loc[nzs_beams.index[nzs_beams['Ix'] >= bm_Ix_modif[3] * base_Ix].tolist()[-1]]
 bm_sect_flr_11 = nzs_beams.loc[nzs_beams.index[nzs_beams['Ix'] >= bm_Ix_modif[4] * base_Ix].tolist()[-1]]
 
-# Assume linear relationship
-# Base Ix & slope
+bm_sections = [bm_sect_flr_1.name, bm_sect_flr_2_to_4.name, bm_sect_flr_5_to_7.name, bm_sect_flr_8_to_10.name, bm_sect_flr_11.name]
 
 bm_prop_flr_1 = [bm_sect_flr_1, bm_E, bm_G, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
 bm_prop_flr_2_to_4 = [bm_sect_flr_2_to_4, bm_E, bm_G, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
@@ -263,15 +239,28 @@ col_transf_tag_NS = 2
 col_beam_mom_ratio = 1.25
 
 col_sect_flr_1 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= col_beam_mom_ratio * bm_sect_flr_1['Zx']].tolist()[-1]]
+
+# Keep the same column designation up the building height, while changing to lighter sections
+col_designation = col_sect_flr_1.name
+
+desig = ''
+for char in col_designation:
+    desig += char
+    if char == 'B' or char == 'C':
+        break
+
 col_sect_flr_2_to_4 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= col_beam_mom_ratio * bm_sect_flr_2_to_4['Zx']].tolist()[-1]]
 col_sect_flr_5_to_7 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= col_beam_mom_ratio * bm_sect_flr_5_to_7['Zx']].tolist()[-1]]
-col_sect_8_to_10 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= col_beam_mom_ratio * bm_sect_flr_8_to_10['Zx']].tolist()[-1]]
+col_sect_flr_8_to_10 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= col_beam_mom_ratio * bm_sect_flr_8_to_10['Zx']].tolist()[-1]]
 col_sect_flr_11 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= col_beam_mom_ratio * bm_sect_flr_11['Zx']].tolist()[-1]]
+
+col_sections = [col_sect_flr_1.name, col_sect_flr_2_to_4.name, col_sect_flr_5_to_7.name, col_sect_flr_8_to_10.name, col_sect_flr_11.name]
+
 
 col_prop_flr_1 = [col_sect_flr_1, col_E, col_G, col_transf_tag_EW, col_transf_tag_NS, pzone_transf_tag_col]
 col_prop_flr_2_to_4 = [col_sect_flr_2_to_4, col_E, col_G, col_transf_tag_EW, col_transf_tag_NS, pzone_transf_tag_col]
 col_prop_5_to_7 = [col_sect_flr_5_to_7, col_E, col_G, col_transf_tag_EW, col_transf_tag_NS, pzone_transf_tag_col]
-col_prop_8_to_10 = [col_sect_8_to_10, col_E, col_G, col_transf_tag_EW, col_transf_tag_NS, pzone_transf_tag_col]
+col_prop_8_to_10 = [col_sect_flr_8_to_10, col_E, col_G, col_transf_tag_EW, col_transf_tag_NS, pzone_transf_tag_col]
 col_prop_flr_11 = [col_sect_flr_11, col_E, col_G, col_transf_tag_EW, col_transf_tag_NS, pzone_transf_tag_col]
 
 
@@ -684,7 +673,7 @@ return_per_factor_sls = 0.25
 return_per_factor_uls = 1.3
 fault_factor = 1.0
 perform_factor = 0.7
-ductility_factor = 3.0  # SMF  4.0
+ductility_factor = 4.0  # SMF  4.0
 story_weights = np.array(list(total_floor_mass.values())) * grav_metric
 seismic_weight = story_weights.sum()
 
@@ -741,6 +730,10 @@ if theta_ok:
     print('Stability requirements satisfied.')
 else:
     print('Stability requirements NOT satisfied.')
+
+
+print('\nBeam sections: ', bm_sections)
+print('\nColumn sections: ', col_sections)
 
 # CHECK STRENGTH REQUIREMENTS
 
