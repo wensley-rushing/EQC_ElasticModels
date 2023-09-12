@@ -626,7 +626,7 @@ if eigen:
     com_eigen_vec_x /=  com_eigen_vec_x[-1]
     com_eigen_vec_y /=  com_eigen_vec_y[-1]
 
-    modal_prop = ops.modalProperties('-file', 'ModalReport_RCSW_rigid_links.txt', '-unorm', '-return')
+    modal_prop = ops.modalProperties('-file', 'ModalReport_RCSW.txt', '-unorm', '-return')
 
     # Apply Damping
     damping_ratio = 0.05  # 5% Damping

@@ -965,7 +965,7 @@ torsional_direc = ['X', 'Y']
 torsional_sign = [1, -1]
 torsional_folder = ['positive', 'negative']
 
-# """
+"""
 # Perform static analysis for loading in X & Y direction
 for ii in range(len(torsional_direc)):
 
@@ -999,18 +999,31 @@ for ii in range(len(torsional_direc)):
         accident_torsion_res_folder = './accidental_torsion_results/' + torsional_folder[jj] + torsional_direc[ii] + '/'
         os.makedirs(accident_torsion_res_folder, exist_ok=True)
 
-        # Create recorder for beam-response in direction of static loading
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor01_beamResp.txt', '-precision', 16, '-region', 201, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor02_beamResp.txt', '-precision', 16, '-region', 202, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor03_beamResp.txt', '-precision', 16, '-region', 203, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor04_beamResp.txt', '-precision', 16, '-region', 204, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor05_beamResp.txt', '-precision', 16, '-region', 205, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor06_beamResp.txt', '-precision', 16, '-region', 206, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor07_beamResp.txt', '-precision', 16, '-region', 207, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor08_beamResp.txt', '-precision', 16, '-region', 208, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor09_beamResp.txt', '-precision', 16, '-region', 209, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor10_beamResp.txt', '-precision', 16, '-region', 210, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor11_beamResp.txt', '-precision', 16, '-region', 211, 'force')
+        # Create recorders for column response in direction of excitation
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor01_colResp.txt', '-precision', 9, '-region', 301, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor02_colResp.txt', '-precision', 9, '-region', 302, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor03_colResp.txt', '-precision', 9, '-region', 303, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor04_colResp.txt', '-precision', 9, '-region', 304, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor05_colResp.txt', '-precision', 9, '-region', 305, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor06_colResp.txt', '-precision', 9, '-region', 306, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor07_colResp.txt', '-precision', 9, '-region', 307, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor08_colResp.txt', '-precision', 9, '-region', 308, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor09_colResp.txt', '-precision', 9, '-region', 309, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor10_colResp.txt', '-precision', 9, '-region', 310, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor11_colResp.txt', '-precision', 9, '-region', 311, 'force')
+
+        # Create recorders for wall response in direction of excitation
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor01_wallResp.txt', '-precision', 9, '-region', 401, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor02_wallResp.txt', '-precision', 9, '-region', 402, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor03_wallResp.txt', '-precision', 9, '-region', 403, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor04_wallResp.txt', '-precision', 9, '-region', 404, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor05_wallResp.txt', '-precision', 9, '-region', 405, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor06_wallResp.txt', '-precision', 9, '-region', 406, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor07_wallResp.txt', '-precision', 9, '-region', 407, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor08_wallResp.txt', '-precision', 9, '-region', 408, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor09_wallResp.txt', '-precision', 9, '-region', 409, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor10_wallResp.txt', '-precision', 9, '-region', 410, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor11_wallResp.txt', '-precision', 9, '-region', 411, 'force')
 
         # Base shear
         ops.recorder('Node', '-file', accident_torsion_res_folder + 'baseShearX.txt', '-node',
@@ -1038,4 +1051,4 @@ for ii in range(len(torsional_direc)):
         print('=============================================================')
 
 print('\nStatic analysis for accidental torsion completed...')
-# """
+"""

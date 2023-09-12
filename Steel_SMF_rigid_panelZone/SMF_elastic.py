@@ -436,7 +436,7 @@ def build_model():
     create_floor(roof_flr, '11', bm_prop_flr_11, col_prop_flr_11, 'Roof')
 
     # ============================================================================
-    # Create regions for SMF beams based on floor
+    # Create regions for SMF beams & columns based on floor
     # ============================================================================
     # Get all element tags
     elem_tags = ops.getEleTags()
@@ -445,9 +445,11 @@ def build_model():
                   '07', '08', '09', '10', '11']
 
     beam_tags = []
+    col_tags = []
 
     for floor in floor_nums:
         floor_bm_tags = []
+        floor_col_tags = []
 
         for tag in elem_tags:
 
@@ -455,8 +457,14 @@ def build_model():
             if str(tag).startswith('2' + floor):
                 floor_bm_tags.append(tag)
 
-        beam_tags.append(floor_bm_tags)
+            # Only select column elements
+            if str(tag).startswith('3' + floor):
+                floor_col_tags.append(tag)
 
+        beam_tags.append(floor_bm_tags)
+        col_tags.append(floor_col_tags)
+
+    # Beams
     ops.region(201, '-eleOnly', *beam_tags[0])  # Region for all beams on 1st floor
     ops.region(202, '-eleOnly', *beam_tags[1])  # Region for all beams on 2nd floor
     ops.region(203, '-eleOnly', *beam_tags[2])  # Region for all beams on 3rd floor
@@ -469,6 +477,18 @@ def build_model():
     ops.region(210, '-eleOnly', *beam_tags[9])  # Region for all beams on 10th floor
     ops.region(211, '-eleOnly', *beam_tags[10]) # Region for all beams on 11th floor
 
+    # Columns
+    ops.region(301, '-eleOnly', *col_tags[0])  # Region for all columns on 1st floor
+    ops.region(302, '-eleOnly', *col_tags[1])  # Region for all columns on 2nd floor
+    ops.region(303, '-eleOnly', *col_tags[2])  # Region for all columns on 3rd floor
+    ops.region(304, '-eleOnly', *col_tags[3])  # Region for all columns on 4th floor
+    ops.region(305, '-eleOnly', *col_tags[4])  # Region for all columns on 5th floor
+    ops.region(306, '-eleOnly', *col_tags[5])  # Region for all columns on 6th floor
+    ops.region(307, '-eleOnly', *col_tags[6])  # Region for all columns on 7th floor
+    ops.region(308, '-eleOnly', *col_tags[7])  # Region for all columns on 8th floor
+    ops.region(309, '-eleOnly', *col_tags[8])  # Region for all columns on 9th floor
+    ops.region(310, '-eleOnly', *col_tags[9])  # Region for all columns on 10th floor
+    ops.region(311, '-eleOnly', *col_tags[10]) # Region for all columns on 11th floor
 
 # Create pvd recorder
 record_direc = './pvd/'
@@ -583,17 +603,31 @@ if mrsa:
         os.makedirs(mrsa_res_folder, exist_ok=True)
 
         # Create recorders for beam-response in direction of excitation
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor01_beamResp.txt', '-precision', 16, '-region', 201, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor02_beamResp.txt', '-precision', 16, '-region', 202, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor03_beamResp.txt', '-precision', 16, '-region', 203, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor04_beamResp.txt', '-precision', 16, '-region', 204, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor05_beamResp.txt', '-precision', 16, '-region', 205, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor06_beamResp.txt', '-precision', 16, '-region', 206, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor07_beamResp.txt', '-precision', 16, '-region', 207, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor08_beamResp.txt', '-precision', 16, '-region', 208, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor09_beamResp.txt', '-precision', 16, '-region', 209, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor10_beamResp.txt', '-precision', 16, '-region', 210, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor11_beamResp.txt', '-precision', 16, '-region', 211, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor01_beamResp.txt', '-precision', 9, '-region', 201, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor02_beamResp.txt', '-precision', 9, '-region', 202, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor03_beamResp.txt', '-precision', 9, '-region', 203, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor04_beamResp.txt', '-precision', 9, '-region', 204, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor05_beamResp.txt', '-precision', 9, '-region', 205, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor06_beamResp.txt', '-precision', 9, '-region', 206, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor07_beamResp.txt', '-precision', 9, '-region', 207, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor08_beamResp.txt', '-precision', 9, '-region', 208, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor09_beamResp.txt', '-precision', 9, '-region', 209, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor10_beamResp.txt', '-precision', 9, '-region', 210, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor11_beamResp.txt', '-precision', 9, '-region', 211, 'force')
+
+        # Create recorders for column response in direction of excitation
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor01_colResp.txt', '-precision', 9, '-region', 301, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor02_colResp.txt', '-precision', 9, '-region', 302, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor03_colResp.txt', '-precision', 9, '-region', 303, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor04_colResp.txt', '-precision', 9, '-region', 304, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor05_colResp.txt', '-precision', 9, '-region', 305, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor06_colResp.txt', '-precision', 9, '-region', 306, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor07_colResp.txt', '-precision', 9, '-region', 307, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor08_colResp.txt', '-precision', 9, '-region', 308, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor09_colResp.txt', '-precision', 9, '-region', 309, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor10_colResp.txt', '-precision', 9, '-region', 310, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor11_colResp.txt', '-precision', 9, '-region', 311, 'force')
+
 
         # Create recorders to store nodal displacements at the building edges
         ops.recorder('Node', '-file', mrsa_res_folder + 'lowerLeftCornerDisp.txt', '-node', *list(smf_node_tags.loc['col1'])[1:], '-dof', direcs[ii], 'disp')
@@ -803,17 +837,17 @@ for ii in range(len(torsional_direc)):
         os.makedirs(accident_torsion_res_folder, exist_ok=True)
 
         # Create recorder for beam-response in direction of static loading
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor01_beamResp.txt', '-precision', 16, '-region', 201, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor02_beamResp.txt', '-precision', 16, '-region', 202, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor03_beamResp.txt', '-precision', 16, '-region', 203, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor04_beamResp.txt', '-precision', 16, '-region', 204, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor05_beamResp.txt', '-precision', 16, '-region', 205, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor06_beamResp.txt', '-precision', 16, '-region', 206, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor07_beamResp.txt', '-precision', 16, '-region', 207, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor08_beamResp.txt', '-precision', 16, '-region', 208, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor09_beamResp.txt', '-precision', 16, '-region', 209, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor10_beamResp.txt', '-precision', 16, '-region', 210, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor11_beamResp.txt', '-precision', 16, '-region', 211, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor01_beamResp.txt', '-precision', 9, '-region', 201, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor02_beamResp.txt', '-precision', 9, '-region', 202, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor03_beamResp.txt', '-precision', 9, '-region', 203, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor04_beamResp.txt', '-precision', 9, '-region', 204, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor05_beamResp.txt', '-precision', 9, '-region', 205, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor06_beamResp.txt', '-precision', 9, '-region', 206, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor07_beamResp.txt', '-precision', 9, '-region', 207, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor08_beamResp.txt', '-precision', 9, '-region', 208, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor09_beamResp.txt', '-precision', 9, '-region', 209, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor10_beamResp.txt', '-precision', 9, '-region', 210, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor11_beamResp.txt', '-precision', 9, '-region', 211, 'force')
 
         # Base shear
         ops.recorder('Node', '-file', accident_torsion_res_folder + 'baseShearX.txt', '-node',
