@@ -19,6 +19,7 @@ sys.path.append('../')
 from helper_functions.create_floor_shell import refine_mesh
 from helper_functions.create_floor_shell import create_shell
 from helper_functions.cqc_modal_combo import modal_combo
+from helper_functions.get_beam_col_demands import process_beam_col_resp
 from helper_functions.get_story_drift import compute_story_drifts
 from helper_functions.elf_new_zealand import nz_horiz_seismic_shear, nz_horiz_force_distribution
 from helper_functions.get_spectral_shape_factor import spectral_shape_fac
@@ -872,6 +873,12 @@ tir_y_edgeF = np.maximum(lower_left_corner_dispY, lower_right_corner_dispY) / (0
 # ============================================================================
 # Post-process MRSA results
 # ============================================================================
+col_demands_mrsa_X = process_beam_col_resp('col', './mrsa_results/dirX/', lambda_list, damping_ratio, num_modes)
+col_demands_mrsa_Y = process_beam_col_resp('col', './mrsa_results/dirY/', lambda_list, damping_ratio, num_modes)
+
+wall_demands_mrsa_X = process_beam_col_resp('wall', './mrsa_results/dirX/', lambda_list, damping_ratio, num_modes)
+wall_demands_mrsa_Y = process_beam_col_resp('wall', './mrsa_results/dirY/', lambda_list, damping_ratio, num_modes)
+
 mrsa_base_shearX = modal_combo(np.loadtxt('./mrsa_results/dirX/baseShearX.txt'), lambda_list, damping_ratio, num_modes).sum()
 mrsa_base_shearY = modal_combo(np.loadtxt('./mrsa_results/dirY/baseShearY.txt'), lambda_list, damping_ratio, num_modes).sum()
 
