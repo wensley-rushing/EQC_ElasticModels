@@ -757,7 +757,7 @@ grav_direc = './gravity_results/'
 os.makedirs(grav_direc, exist_ok=True)
 
 ops.recorder('Element', '-file', grav_direc + 'colForces.txt', '-ele', 20111, 20112, '-dof', 3, 'globalForce')
-ops.recorder('Node', '-file', grav_direc + 'nodeRxn.txt', '-node', *lfre_node_tags['00'].tolist(), '-dof', 3, 'reaction')
+ops.recorder('Node', '-file', grav_direc + 'nodeRxn.txt', '-node', *lfre_node_tags['00'].tolist(), '-dof', 1, 2, 3, 4, 5, 6, 'reaction')
 
 
 num_step_sWgt = 1     # Set weight increments
@@ -907,6 +907,10 @@ elf_force_distrib = nz_horiz_force_distribution(elf_base_shear, story_weights,
 elf_mrsaX_scale_factor = elf_base_shear / mrsa_base_shearX
 elf_mrsaY_scale_factor = elf_base_shear / mrsa_base_shearY
 
+# ============================================================================
+# Check drift and stability requirements
+# ============================================================================
+
 # Deflection amplification factors
 kp  = 0.015 + 0.0075*(ductility_factor - 1)
 kp = min(max(0.0015, kp), 0.03)
@@ -959,8 +963,8 @@ else:
 floor_dimen_x = 29.410 * m
 floor_dimen_y = 31.025 * m
 
-accid_ecc_x = 0.1 * floor_dimen_x
-accid_ecc_y = 0.1 * floor_dimen_y
+accid_ecc_x = floor_dimen_x / 10
+accid_ecc_y = floor_dimen_y / 10
 
 torsional_mom_x = elf_force_distrib * accid_ecc_y
 torsional_mom_y = elf_force_distrib * accid_ecc_x

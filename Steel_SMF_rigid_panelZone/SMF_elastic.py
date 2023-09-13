@@ -561,7 +561,7 @@ if eigen:
 grav_direc = './gravity_results/'
 os.makedirs(grav_direc, exist_ok=True)
 
-ops.recorder('Node', '-file', grav_direc + 'nodeRxn.txt', '-node', *smf_node_tags['00'].tolist(), '-dof', 3, 'reaction')
+ops.recorder('Node', '-file', grav_direc + 'nodeRxn.txt', '-node', *smf_node_tags['00'].tolist(), '-dof', 1, 2, 3, 4, 5, 6, 'reaction')
 ops.recorder('Element', '-file', grav_direc + 'col10_forces.txt', '-ele', 20110, 'force')  # Column 10
 
 num_step_sWgt = 1     # Set weight increments
@@ -727,6 +727,10 @@ elf_force_distrib = nz_horiz_force_distribution(elf_base_shear, story_weights,
 elf_mrsaX_scale_factor = elf_base_shear / mrsa_base_shearX
 elf_mrsaY_scale_factor = elf_base_shear / mrsa_base_shearY
 
+# ============================================================================
+# Check drift and stability requirements
+# ============================================================================
+
 # Deflection amplification factors
 kp  = 0.015 + 0.0075*(ductility_factor - 1)
 kp = min(max(0.0015, kp), 0.03)
@@ -779,7 +783,7 @@ print('\nColumn sections: ', col_sections)
 # CHECK STRENGTH REQUIREMENTS
 
 
-"""
+# """
 '========================================================================='
 'NEED TO SATISFY DRIFT, STABILITY & STRENGTH REQUIREMENTS BEFORE DOING THIS'
 '========================================================================='
@@ -790,8 +794,8 @@ print('\nColumn sections: ', col_sections)
 floor_dimen_x = 29.410 * m
 floor_dimen_y = 31.025 * m
 
-accid_ecc_x = 0.1 * floor_dimen_x
-accid_ecc_y = 0.1 * floor_dimen_y
+accid_ecc_x = floor_dimen_x / 10
+accid_ecc_y = floor_dimen_y / 10
 
 torsional_mom_x = elf_force_distrib * accid_ecc_y
 torsional_mom_y = elf_force_distrib * accid_ecc_x
@@ -824,14 +828,14 @@ for ii in range(len(torsional_direc)):
         ops.timeSeries('Constant', ts_tag)
         ops.pattern('Plain', pattern_tag, ts_tag)
 
-        # Loop through each COM node and apply torsional moment
+        # # Loop through each COM node and apply torsional moment
         for kk in range(len(com_nodes)):
-            if ii == 1:  # Torsional moment applied about x-axis
-                ops.load(com_nodes[kk], 0., 0., 0., torsional_mom_x[kk] * torsional_sign[jj], 0., 0.)
+            if torsional_direc[ii] == 'X':  # Torsional moment applied about x-axis
+                ops.load(com_nodes[kk], 0., 0., 0., 0., 0., torsional_mom_x[kk] * torsional_sign[jj])
                 # print('Moment ' + str(torsional_direc[ii]) + ': ' + str(torsional_mom_x[kk] * torsional_sign[jj]))
 
             else:  # Torsional moment applied about y-axis
-                ops.load(com_nodes[kk], 0., 0., 0., 0., torsional_mom_y[kk] * torsional_sign[jj], 0.)
+                ops.load(com_nodes[kk], 0., 0., 0., 0., 0., torsional_mom_y[kk] * torsional_sign[jj])
                 # print('Moment ' + str(torsional_direc[ii]) + ': ' + str(torsional_mom_y[kk] * torsional_sign[jj]))
 
 
@@ -852,9 +856,22 @@ for ii in range(len(torsional_direc)):
         ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor10_beamResp.txt', '-precision', 9, '-region', 210, 'force')
         ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor11_beamResp.txt', '-precision', 9, '-region', 211, 'force')
 
+        # Create recorders for column response direction of static loading
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor01_colResp.txt', '-precision', 9, '-region', 301, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor02_colResp.txt', '-precision', 9, '-region', 302, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor03_colResp.txt', '-precision', 9, '-region', 303, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor04_colResp.txt', '-precision', 9, '-region', 304, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor05_colResp.txt', '-precision', 9, '-region', 305, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor06_colResp.txt', '-precision', 9, '-region', 306, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor07_colResp.txt', '-precision', 9, '-region', 307, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor08_colResp.txt', '-precision', 9, '-region', 308, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor09_colResp.txt', '-precision', 9, '-region', 309, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor10_colResp.txt', '-precision', 9, '-region', 310, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor11_colResp.txt', '-precision', 9, '-region', 311, 'force')
+
         # Base shear
         ops.recorder('Node', '-file', accident_torsion_res_folder + 'baseShearX.txt', '-node',
-                      *smf_node_tags['00'].tolist(), '-dof', 1, 2, 4, 5, 'reaction')  # Fx, Fy, Mx, My
+                      *smf_node_tags['00'].tolist(), '-dof', 1, 2, 3, 4, 5, 6, 'reaction')  # Fx, Fy, Fz, Mx, My, Mz
 
         # Perform static analysis
         num_step_sWgt = 1     # Set weight increments
@@ -878,6 +895,19 @@ for ii in range(len(torsional_direc)):
         print('=============================================================')
 
 print('\nStatic analysis for accidental torsion completed...')
-"""
+# """
+
+# ============================================================================
+# Post-process accidental torsion results
+# ============================================================================
+# beam_demands_accid_torsion_X = process_beam_col_resp('beam', './accidental_torsion_results/dirX/', lambda_list, damping_ratio, num_modes)
+# beam_demands_accid_torsion_Y = process_beam_col_resp('beam', './accidental_torsion_results/dirY/', lambda_list, damping_ratio, num_modes)
+
+# col_demands_accid_torsion_X = process_beam_col_resp('col', './accidental_torsion_results/dirX/', lambda_list, damping_ratio, num_modes)
+# col_demands_accid_torsion_Y = process_beam_col_resp('col', './accidental_torsion_results/dirY/', lambda_list, damping_ratio, num_modes)
 
 
+bm_tors_pos_x = np.loadtxt('./accidental_torsion_results/positiveX/floor01_beamResp.txt')
+bm_tors_neg_x = np.loadtxt('./accidental_torsion_results/negativeX/floor01_beamResp.txt')
+bm_tors_neg_y = np.loadtxt('./accidental_torsion_results/negativeY/floor01_beamResp.txt')
+bm_tors_pos_y = np.loadtxt('./accidental_torsion_results/positiveY/floor01_beamResp.txt')

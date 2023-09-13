@@ -583,6 +583,10 @@ def build_model(optim_params):
                                                     np.cumsum(story_heights))
 
 
+    # ============================================================================
+    # Check drift and stability requirements
+    # ============================================================================
+
     # Deflection amplification factors
     kp  = 0.015 + 0.0075*(ductility_factor - 1)
     kp = min(max(0.0015, kp), 0.03)
