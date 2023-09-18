@@ -693,12 +693,6 @@ tir_y_edgeF = np.maximum(lower_left_corner_dispY, lower_right_corner_dispY) / (0
 # ============================================================================
 # Post-process MRSA results
 # ============================================================================
-beam_demands_mrsa_X = process_beam_col_resp('beam', './mrsa_results/dirX/', lambda_list, damping_ratio, num_modes)
-beam_demands_mrsa_Y = process_beam_col_resp('beam', './mrsa_results/dirY/', lambda_list, damping_ratio, num_modes)
-
-col_demands_mrsa_X = process_beam_col_resp('col', './mrsa_results/dirX/', lambda_list, damping_ratio, num_modes)
-col_demands_mrsa_Y = process_beam_col_resp('col', './mrsa_results/dirY/', lambda_list, damping_ratio, num_modes)
-
 mrsa_base_shearX = modal_combo(np.loadtxt('./mrsa_results/dirX/baseShearX.txt'), lambda_list, damping_ratio, num_modes).sum()
 mrsa_base_shearY = modal_combo(np.loadtxt('./mrsa_results/dirY/baseShearY.txt'), lambda_list, damping_ratio, num_modes).sum()
 
@@ -749,8 +743,8 @@ com_dispY = np.loadtxt('./mrsa_results/dirY/COM_dispY.txt')
 story_driftY = compute_story_drifts(com_dispY, story_heights, lambda_list, damping_ratio, num_modes)
 
 # Amplify drifts by required factors
-story_driftX *=  (ductility_factor * pdelta_fac * drift_modif_fac)
-story_driftY *=  (ductility_factor * pdelta_fac * drift_modif_fac)
+story_driftX *=  (elf_mrsaX_scale_factor * ductility_factor * pdelta_fac * drift_modif_fac)
+story_driftY *=  (elf_mrsaY_scale_factor * ductility_factor * pdelta_fac * drift_modif_fac)
 
 # CHECK DRIFT REQUIREMENTS
 max_story_drift = max(story_driftX.max(), story_driftY.max())
@@ -761,7 +755,6 @@ if drift_ok:
     print('Story drift requirements satisfied.')
 else:
     print('Story drift requirements NOT satisfied.')
-
 
 # CHECK STABILITY REQUIREMENTS (P-DELTA) NZS 1170.5:2004 - Sect 6.5.1
 thetaX = story_weights * 0.01 * story_driftX / (elf_force_distrib * story_heights)
@@ -832,12 +825,9 @@ for ii in range(len(torsional_direc)):
         for kk in range(len(com_nodes)):
             if torsional_direc[ii] == 'X':  # Torsional moment applied about x-axis
                 ops.load(com_nodes[kk], 0., 0., 0., 0., 0., torsional_mom_x[kk] * torsional_sign[jj])
-                # print('Moment ' + str(torsional_direc[ii]) + ': ' + str(torsional_mom_x[kk] * torsional_sign[jj]))
 
             else:  # Torsional moment applied about y-axis
                 ops.load(com_nodes[kk], 0., 0., 0., 0., 0., torsional_mom_y[kk] * torsional_sign[jj])
-                # print('Moment ' + str(torsional_direc[ii]) + ': ' + str(torsional_mom_y[kk] * torsional_sign[jj]))
-
 
         # Create directory to save results
         accident_torsion_res_folder = './accidental_torsion_results/' + torsional_folder[jj] + torsional_direc[ii] + '/'
@@ -895,19 +885,16 @@ for ii in range(len(torsional_direc)):
         print('=============================================================')
 
 print('\nStatic analysis for accidental torsion completed...')
+
+# ============================================================================
+# Post-process MRSA & accidental torsion results
+# ============================================================================
+beam_demandsX = process_beam_col_resp('beam', './mrsa_results/dirX/', './accidental_torsion_results/positiveX/', './accidental_torsion_results/negativeX/', lambda_list, damping_ratio, num_modes, elf_mrsaX_scale_factor)
+beam_demandsY = process_beam_col_resp('beam', './mrsa_results/dirY/', './accidental_torsion_results/positiveY/', './accidental_torsion_results/negativeY/',lambda_list, damping_ratio, num_modes, elf_mrsaY_scale_factor)
+
+col_demandsX = process_beam_col_resp('col', './mrsa_results/dirX/', './accidental_torsion_results/positiveX/', './accidental_torsion_results/negativeX/', lambda_list, damping_ratio, num_modes, elf_mrsaX_scale_factor)
+col_demandsY = process_beam_col_resp('col', './mrsa_results/dirY/', './accidental_torsion_results/positiveY/', './accidental_torsion_results/negativeY/', lambda_list, damping_ratio, num_modes, elf_mrsaY_scale_factor)
+
 # """
 
-# ============================================================================
-# Post-process accidental torsion results
-# ============================================================================
-# beam_demands_accid_torsion_X = process_beam_col_resp('beam', './accidental_torsion_results/dirX/', lambda_list, damping_ratio, num_modes)
-# beam_demands_accid_torsion_Y = process_beam_col_resp('beam', './accidental_torsion_results/dirY/', lambda_list, damping_ratio, num_modes)
 
-# col_demands_accid_torsion_X = process_beam_col_resp('col', './accidental_torsion_results/dirX/', lambda_list, damping_ratio, num_modes)
-# col_demands_accid_torsion_Y = process_beam_col_resp('col', './accidental_torsion_results/dirY/', lambda_list, damping_ratio, num_modes)
-
-
-bm_tors_pos_x = np.loadtxt('./accidental_torsion_results/positiveX/floor01_beamResp.txt')
-bm_tors_neg_x = np.loadtxt('./accidental_torsion_results/negativeX/floor01_beamResp.txt')
-bm_tors_neg_y = np.loadtxt('./accidental_torsion_results/negativeY/floor01_beamResp.txt')
-bm_tors_pos_y = np.loadtxt('./accidental_torsion_results/positiveY/floor01_beamResp.txt')
