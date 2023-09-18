@@ -717,9 +717,9 @@ elf_base_shear = nz_horiz_seismic_shear(spectral_shape_factor, hazard_factor,
 elf_force_distrib = nz_horiz_force_distribution(elf_base_shear, story_weights,
                                                 np.cumsum(story_heights))
 
-# Compute factors for scaling MRSA demands to ELF demands
-elf_mrsaX_scale_factor = elf_base_shear / mrsa_base_shearX
-elf_mrsaY_scale_factor = elf_base_shear / mrsa_base_shearY
+# Compute factors for scaling MRSA demands to ELF demands NZS 1170.5:2004 - Sect. 5.2.2.2b
+elf_mrsaX_scale_factor = max(elf_base_shear / mrsa_base_shearX, 1.0)
+elf_mrsaY_scale_factor = max(elf_base_shear / mrsa_base_shearY, 1.0)
 
 # ============================================================================
 # Check drift and stability requirements
@@ -730,7 +730,6 @@ kp  = 0.015 + 0.0075*(ductility_factor - 1)
 kp = min(max(0.0015, kp), 0.03)
 
 pdelta_fac = (kp * seismic_weight + elf_base_shear) / elf_base_shear  # NZS 1170.5-2004: Sec 7.2.1.2 & 6.5.4.1
-
 drift_modif_fac = 1.5  # NZS 1170.5-2004: Table 7.1
 
 # Compute story drifts
@@ -776,11 +775,8 @@ print('\nColumn sections: ', col_sections)
 # CHECK STRENGTH REQUIREMENTS
 
 
-# """
-'========================================================================='
-'NEED TO SATISFY DRIFT, STABILITY & STRENGTH REQUIREMENTS BEFORE DOING THIS'
-'========================================================================='
 
+'NEED TO SATISFY DRIFT, STABILITY & STRENGTH REQUIREMENTS BEFORE DOING THIS'
 # ============================================================================
 # Perform static analysis for accidental torsional moment
 # ============================================================================
@@ -889,12 +885,21 @@ print('\nStatic analysis for accidental torsion completed...')
 # ============================================================================
 # Post-process MRSA & accidental torsion results
 # ============================================================================
-beam_demandsX = process_beam_col_resp('beam', './mrsa_results/dirX/', './accidental_torsion_results/positiveX/', './accidental_torsion_results/negativeX/', lambda_list, damping_ratio, num_modes, elf_mrsaX_scale_factor)
-beam_demandsY = process_beam_col_resp('beam', './mrsa_results/dirY/', './accidental_torsion_results/positiveY/', './accidental_torsion_results/negativeY/',lambda_list, damping_ratio, num_modes, elf_mrsaY_scale_factor)
+beam_demandsX = process_beam_col_resp('beam', './mrsa_results/dirX/', './accidental_torsion_results/positiveX/',
+                                      './accidental_torsion_results/negativeX/', lambda_list, damping_ratio,
+                                      num_modes, elf_mrsaX_scale_factor, pdelta_fac)
 
-col_demandsX = process_beam_col_resp('col', './mrsa_results/dirX/', './accidental_torsion_results/positiveX/', './accidental_torsion_results/negativeX/', lambda_list, damping_ratio, num_modes, elf_mrsaX_scale_factor)
-col_demandsY = process_beam_col_resp('col', './mrsa_results/dirY/', './accidental_torsion_results/positiveY/', './accidental_torsion_results/negativeY/', lambda_list, damping_ratio, num_modes, elf_mrsaY_scale_factor)
+beam_demandsY = process_beam_col_resp('beam', './mrsa_results/dirY/', './accidental_torsion_results/positiveY/',
+                                      './accidental_torsion_results/negativeY/', lambda_list, damping_ratio,
+                                      num_modes, elf_mrsaY_scale_factor, pdelta_fac)
 
-# """
+col_demandsX = process_beam_col_resp('col', './mrsa_results/dirX/', './accidental_torsion_results/positiveX/',
+                                     './accidental_torsion_results/negativeX/', lambda_list, damping_ratio,
+                                     num_modes, elf_mrsaX_scale_factor, pdelta_fac)
+
+col_demandsY = process_beam_col_resp('col', './mrsa_results/dirY/', './accidental_torsion_results/positiveY/',
+                                     './accidental_torsion_results/negativeY/', lambda_list, damping_ratio, num_modes,
+                                     elf_mrsaY_scale_factor, pdelta_fac)
+
 
 
