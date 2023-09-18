@@ -591,7 +591,8 @@ def build_model(optim_params):
     kp  = 0.015 + 0.0075*(ductility_factor - 1)
     kp = min(max(0.0015, kp), 0.03)
 
-    pdelta_fac = (kp * seismic_weight + elf_base_shear) / elf_base_shear  # NZS 1170.5-2004: Sec 7.2.1.2 & 6.5.4.1
+    # pdelta_fac = (kp * seismic_weight + elf_base_shear) / elf_base_shear  # NZS 1170.5-2004: Sec 7.2.1.2 & 6.5.4.1
+    pdelta_fac = 1
 
     drift_modif_fac = 1.5  # NZS 1170.5-2004: Table 7.1
 
@@ -610,7 +611,7 @@ def build_model(optim_params):
 
     # CHECK DRIFT REQUIREMENTS
     max_story_drift = max(story_driftX.max(), story_driftY.max())
-    drift_ok = max_story_drift < 2.5  # Maximum story drift limit = 2.5%  NZS 1170.5:2004 - Sect 7.5.1
+    # drift_ok = max_story_drift < 2.5  # Maximum story drift limit = 2.5%  NZS 1170.5:2004 - Sect 7.5.1
 
     # print('\nMaximum story drift: {:.2f}%'.format(max_story_drift))
     # if drift_ok:
@@ -620,11 +621,11 @@ def build_model(optim_params):
 
 
     # CHECK STABILITY REQUIREMENTS (P-DELTA) NZS 1170.5:2004 - Sect 6.5.1
-    thetaX = story_weights * 0.01 * story_driftX / (elf_force_distrib * story_heights)
-    thetaY = story_weights * 0.01 * story_driftY / (elf_force_distrib * story_heights)
+    # thetaX = story_weights * 0.01 * story_driftX / (elf_force_distrib * story_heights)
+    # thetaY = story_weights * 0.01 * story_driftY / (elf_force_distrib * story_heights)
 
-    max_theta = max(thetaX.max(), thetaY.max())
-    theta_ok = max_theta < 0.3
+    # max_theta = max(thetaX.max(), thetaY.max())
+    # theta_ok = max_theta < 0.3
 
     # print('\nMaximum stability coefficient: {:.2f}'.format(max_theta))
     # if theta_ok:
@@ -791,7 +792,7 @@ print('Objective function value:', fitness_global_best_particle_position)
 run_time = time.time() - init_time
 print("\nRun time:  {} secs".format(run_time))
 
-convergence_history = open("./optimization_results/SMF_nzs-3.txt", 'w+')
+convergence_history = open("./optimization_results/SMF_nzs-4_Pdelta_1.txt", 'w+')
 convergence_history.write("Best Solution History: " + str(param_history) + "\n \n")
 convergence_history.write("Best Fitness History: " + str(fitness_history) + "\n")
 convergence_history.write("Run time: " + str(run_time) + " secs\n")
