@@ -793,6 +793,7 @@ torsional_mom_y = elf_force_distrib * accid_ecc_x
 # New Zealand does not require amplification of accidental torsional moment
 
 torsional_direc = ['X', 'Y']
+elf_dof = [1, 2]
 torsional_sign = [1, -1]
 torsional_folder = ['positive', 'negative']
 
@@ -856,8 +857,8 @@ for ii in range(len(torsional_direc)):
         ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor11_colResp.txt', '-precision', 9, '-region', 311, 'force')
 
         # Base shear
-        ops.recorder('Node', '-file', accident_torsion_res_folder + 'baseShearX.txt', '-node',
-                      *smf_node_tags['00'].tolist(), '-dof', 1, 2, 3, 4, 5, 6, 'reaction')  # Fx, Fy, Fz, Mx, My, Mz
+        ops.recorder('Node', '-file', accident_torsion_res_folder + 'baseShear' + torsional_direc[ii] + '.txt', '-node',
+                      *smf_node_tags['00'].tolist(), '-dof', elf_dof[ii], 'reaction')  # Fx or Fy
 
         # Perform static analysis
         num_step_sWgt = 1     # Set weight increments
@@ -901,5 +902,13 @@ col_demandsY = process_beam_col_resp('col', './mrsa_results/dirY/', './accidenta
                                      './accidental_torsion_results/negativeY/', lambda_list, damping_ratio, num_modes,
                                      elf_mrsaY_scale_factor, pdelta_fac)
 
+# Base shear due to static accidental torsion analysis
+# These should basically equal zero, as only moments are applied about the z-axis for the static analyses.
+accid_torsion_baseShear_pos_X = np.loadtxt('./accidental_torsion_results/positiveX/baseShearX.txt').sum()
+accid_torsion_baseShear_neg_X = np.loadtxt('./accidental_torsion_results/negativeX/baseShearX.txt').sum()
 
+accid_torsion_baseShear_pos_Y = np.loadtxt('./accidental_torsion_results/positiveY/baseShearY.txt').sum()
+accid_torsion_baseShear_neg_Y = np.loadtxt('./accidental_torsion_results/negativeY/baseShearY.txt').sum()
 
+base_shearX = max((mrsa_base_shearX + accid_torsion_baseShear_pos_X), (mrsa_base_shearX + accid_torsion_baseShear_neg_X))
+base_shearY = max((mrsa_base_shearY + accid_torsion_baseShear_pos_Y), (mrsa_base_shearY + accid_torsion_baseShear_neg_Y))
