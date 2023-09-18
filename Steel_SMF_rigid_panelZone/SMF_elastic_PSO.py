@@ -20,6 +20,7 @@ from helper_functions.create_floor_shell import refine_mesh
 from helper_functions.create_floor_shell import create_shell
 from helper_functions.build_smf_column import create_columns
 from helper_functions.build_smf_beam import create_beams
+from helper_functions.cqc_modal_combo import modal_combo
 from helper_functions.get_story_drift import compute_story_drifts
 from helper_functions.elf_new_zealand import nz_horiz_seismic_shear, nz_horiz_force_distribution
 
@@ -530,7 +531,7 @@ def build_model(optim_params):
     for ii in range (len(direcs)):
 
         # Create directory to save results
-        mrsa_res_folder = './optim/mrsa_results/dir' + axis[ii] + '/'
+        mrsa_res_folder = './optimization_results/mrsa_results/dir' + axis[ii] + '/'
         os.makedirs(mrsa_res_folder, exist_ok=True)
 
         # Create recorders for beam-response in direction of excitation
@@ -562,6 +563,12 @@ def build_model(optim_params):
     ops.wipe()
 
     # ============================================================================
+    # Post-process MRSA results
+    # ============================================================================
+    mrsa_base_shearX = modal_combo(np.loadtxt('./optimization_results/mrsa_results/dirX/baseShearX.txt'), lambda_list, damping_ratio, num_modes).sum()
+    mrsa_base_shearY = modal_combo(np.loadtxt('./optimization_results/mrsa_results/dirY/baseShearY.txt'), lambda_list, damping_ratio, num_modes).sum()
+
+    # ============================================================================
     # Perform ELF
     # ============================================================================
     spectral_shape_factor = 0.595
@@ -582,6 +589,9 @@ def build_model(optim_params):
     elf_force_distrib = nz_horiz_force_distribution(elf_base_shear, story_weights,
                                                     np.cumsum(story_heights))
 
+    # Compute factors for scaling MRSA demands to ELF demands NZS 1170.5:2004 - Sect. 5.2.2.2b
+    elf_mrsaX_scale_factor = max(elf_base_shear / mrsa_base_shearX, 1.0)
+    elf_mrsaY_scale_factor = max(elf_base_shear / mrsa_base_shearY, 1.0)
 
     # ============================================================================
     # Check drift and stability requirements
@@ -591,49 +601,26 @@ def build_model(optim_params):
     kp  = 0.015 + 0.0075*(ductility_factor - 1)
     kp = min(max(0.0015, kp), 0.03)
 
-    pdelta_fac = (kp * seismic_weight + elf_base_shear) / elf_base_shear  # NZS 1170.5-2004: Sec 7.2.1.2 & 6.5.4.1
+    # pdelta_fac = (kp * seismic_weight + elf_base_shear) / elf_base_shear  # NZS 1170.5-2004: Sec 7.2.1.2 & 6.5.4.1
+    pdelta_fac = 1
 
     drift_modif_fac = 1.5  # NZS 1170.5-2004: Table 7.1
 
     # Compute story drifts
     # For MRSA in x-direction
-    com_dispX = np.loadtxt('./optim/mrsa_results/dirX/COM_dispX.txt')
+    com_dispX = np.loadtxt('./optimization_results/mrsa_results/dirX/COM_dispX.txt')
     story_driftX = compute_story_drifts(com_dispX, story_heights, lambda_list, damping_ratio, num_modes)
 
     # For MRSA in y-direction
-    com_dispY = np.loadtxt('./optim/mrsa_results/dirY/COM_dispY.txt')
+    com_dispY = np.loadtxt('./optimization_results/mrsa_results/dirY/COM_dispY.txt')
     story_driftY = compute_story_drifts(com_dispY, story_heights, lambda_list, damping_ratio, num_modes)
 
     # Amplify drifts by required factors
-    story_driftX *=  (ductility_factor * pdelta_fac * drift_modif_fac)
-    story_driftY *=  (ductility_factor * pdelta_fac * drift_modif_fac)
+    story_driftX *=  (elf_mrsaX_scale_factor * ductility_factor * pdelta_fac * drift_modif_fac)
+    story_driftY *=  (elf_mrsaY_scale_factor * ductility_factor * pdelta_fac * drift_modif_fac)
 
     # CHECK DRIFT REQUIREMENTS
     max_story_drift = max(story_driftX.max(), story_driftY.max())
-    drift_ok = max_story_drift < 2.5  # Maximum story drift limit = 2.5%  NZS 1170.5:2004 - Sect 7.5.1
-
-    # print('\nMaximum story drift: {:.2f}%'.format(max_story_drift))
-    # if drift_ok:
-    #     print('Story drift requirements satisfied.')
-    # else:
-    #     print('Story drift requirements NOT satisfied.')
-
-
-    # CHECK STABILITY REQUIREMENTS (P-DELTA) NZS 1170.5:2004 - Sect 6.5.1
-    thetaX = story_weights * 0.01 * story_driftX / (elf_force_distrib * story_heights)
-    thetaY = story_weights * 0.01 * story_driftY / (elf_force_distrib * story_heights)
-
-    max_theta = max(thetaX.max(), thetaY.max())
-    theta_ok = max_theta < 0.3
-
-    # print('\nMaximum stability coefficient: {:.2f}'.format(max_theta))
-    # if theta_ok:
-    #     print('Stability requirements satisfied.')
-    # else:
-    #     print('Stability requirements NOT satisfied.')
-
-
-    # CHECK STRENGTH REQUIREMENTS
 
     return max_story_drift
 
@@ -671,9 +658,9 @@ bounds = [bm_Ix_bounds, bm_Ix_slope_bounds]
 particle_size = 50 * nv  # number of particles
 iterations = 50  # max number of iterations
 
-w = 0.9  # inertia constant  0.75
+w = 0.9   # inertia constant  0.75
 c1 = 0.5  # cognitive constant
-c2 = 2  # social constant
+c2 = 2    # social constant
 
 # END OF THE CUSTOMIZATION SECTION
 # ------------------------------------------------------------------------------
@@ -748,8 +735,12 @@ param_history = []
 tol = 1E-6
 converg_count = 0
 
-for i in range(iterations):
-    print("Iteration {}".format(i+1))
+iter_count = 0
+drift_limit = 2.5  # in percent
+
+# for i in range(iterations):
+while fitness_global_best_particle_position > drift_limit:
+    print("Iteration {}".format(iter_count+1))
 
     # cycle through particles in swarm and evaluate fitness
     for j in range(particle_size):
@@ -773,10 +764,10 @@ for i in range(iterations):
     fitness_history.append(fitness_global_best_particle_position)  # record the best fitness
     param_history.append(global_best_particle_position)  # record associated fitness parameters for each iteration
 
-    print('iteration: {}, best_solution: {}, best_fitness: {}'.format(i+1, global_best_particle_position,
+    print('iteration: {}, best_solution: {}, best_fitness: {}'.format(iter_count+1, global_best_particle_position,
                                                                       fitness_global_best_particle_position))
 
-    if i > 0:
+    if iter_count > 0:
         if abs(fitness_history[-1] - fitness_history[-2]) < tol:
             converg_count += 1
         else:
@@ -791,7 +782,7 @@ print('Objective function value:', fitness_global_best_particle_position)
 run_time = time.time() - init_time
 print("\nRun time:  {} secs".format(run_time))
 
-convergence_history = open("./optimization_results/SMF_nzs-3.txt", 'w+')
+convergence_history = open("./optimization_results/SMF_nzs_pDelta-1.txt", 'w+')
 convergence_history.write("Best Solution History: " + str(param_history) + "\n \n")
 convergence_history.write("Best Fitness History: " + str(fitness_history) + "\n")
 convergence_history.write("Run time: " + str(run_time) + " secs\n")

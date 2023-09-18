@@ -203,8 +203,8 @@ bm_transf_tag_y = 4  # Beams oriented in Global-Y direction
 bm_mom_inertia_strong = np.array(list(nzs_beams['Ix']))
 
 # The geometric properties of the beams will be defined relative to the stiffness of the first floor beam
-base_Ix = 10200.21597868362  # No need to multiply by 'mm' or '1E6'
-slope_Ix_line = 0.0034565742429620294
+base_Ix = 10264.080501918139  # No need to multiply by 'mm' or '1E6'
+slope_Ix_line = 0.0034921535577568247
 col_group_heights = np.array([0, 6.2, 15.5, 24.8, 31])  # Height of column groups from the 1st floor
 
 # Assume linear relationship
