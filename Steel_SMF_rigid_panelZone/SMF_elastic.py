@@ -203,8 +203,8 @@ bm_transf_tag_y = 4  # Beams oriented in Global-Y direction
 bm_mom_inertia_strong = np.array(list(nzs_beams['Ix']))
 
 # The geometric properties of the beams will be defined relative to the stiffness of the first floor beam
-base_Ix = 10264.080501918139  # No need to multiply by 'mm' or '1E6'
-slope_Ix_line = 0.0034921535577568247
+base_Ix = 9975.573722316492  # No need to multiply by 'mm' or '1E6'
+slope_Ix_line = 0.004586197032942164
 col_group_heights = np.array([0, 6.2, 15.5, 24.8, 31])  # Height of column groups from the 1st floor
 
 # Assume linear relationship
@@ -729,7 +729,8 @@ elf_mrsaY_scale_factor = max(elf_base_shear / mrsa_base_shearY, 1.0)
 kp  = 0.015 + 0.0075*(ductility_factor - 1)
 kp = min(max(0.0015, kp), 0.03)
 
-pdelta_fac = (kp * seismic_weight + elf_base_shear) / elf_base_shear  # NZS 1170.5-2004: Sec 7.2.1.2 & 6.5.4.1
+# pdelta_fac = (kp * seismic_weight + elf_base_shear) / elf_base_shear  # NZS 1170.5-2004: Sec 7.2.1.2 & 6.5.4.1
+pdelta_fac = 1
 drift_modif_fac = 1.5  # NZS 1170.5-2004: Table 7.1
 
 # Compute story drifts

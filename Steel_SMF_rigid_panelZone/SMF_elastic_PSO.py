@@ -22,7 +22,8 @@ from helper_functions.build_smf_column import create_columns
 from helper_functions.build_smf_beam import create_beams
 from helper_functions.cqc_modal_combo import modal_combo
 from helper_functions.get_story_drift import compute_story_drifts
-from helper_functions.elf_new_zealand import nz_horiz_seismic_shear, nz_horiz_force_distribution
+from helper_functions.elf_new_zealand import nz_horiz_seismic_shear
+from helper_functions.get_spectral_shape_factor import spectral_shape_fac
 
 
 # Define Units
@@ -571,7 +572,7 @@ def build_model(optim_params):
     # ============================================================================
     # Perform ELF
     # ============================================================================
-    spectral_shape_factor = 0.595
+    spectral_shape_factor = spectral_shape_fac(periods[0])
     hazard_factor = 0.13
     return_per_factor_sls = 0.25
     return_per_factor_uls = 1.3
@@ -586,9 +587,6 @@ def build_model(optim_params):
                                             fault_factor, perform_factor, ductility_factor,
                                             seismic_weight)
 
-    elf_force_distrib = nz_horiz_force_distribution(elf_base_shear, story_weights,
-                                                    np.cumsum(story_heights))
-
     # Compute factors for scaling MRSA demands to ELF demands NZS 1170.5:2004 - Sect. 5.2.2.2b
     elf_mrsaX_scale_factor = max(elf_base_shear / mrsa_base_shearX, 1.0)
     elf_mrsaY_scale_factor = max(elf_base_shear / mrsa_base_shearY, 1.0)
@@ -601,8 +599,8 @@ def build_model(optim_params):
     kp  = 0.015 + 0.0075*(ductility_factor - 1)
     kp = min(max(0.0015, kp), 0.03)
 
-    # pdelta_fac = (kp * seismic_weight + elf_base_shear) / elf_base_shear  # NZS 1170.5-2004: Sec 7.2.1.2 & 6.5.4.1
-    pdelta_fac = 1
+    pdelta_fac = (kp * seismic_weight + elf_base_shear) / elf_base_shear  # NZS 1170.5-2004: Sec 7.2.1.2 & 6.5.4.1
+    # pdelta_fac = 1
 
     drift_modif_fac = 1.5  # NZS 1170.5-2004: Table 7.1
 
@@ -654,7 +652,6 @@ optim = -1  # if minimization problem, optim = -1; if maximization problem, opti
 
 bounds = [bm_Ix_bounds, bm_Ix_slope_bounds]
 
-# THE FOLLOWING PARAMETERS ARE OPTIONAL
 particle_size = 50 * nv  # number of particles
 iterations = 50  # max number of iterations
 
@@ -776,13 +773,15 @@ while fitness_global_best_particle_position > drift_limit:
         if converg_count == 20:
             break
 
+    iter_count += 1
+
 print('Optimal solution:', global_best_particle_position)
 print('Objective function value:', fitness_global_best_particle_position)
 
 run_time = time.time() - init_time
 print("\nRun time:  {} secs".format(run_time))
 
-convergence_history = open("./optimization_results/SMF_nzs_pDelta-1.txt", 'w+')
+convergence_history = open("./optimization_results/SMF_nzs_99.txt", 'w+')
 convergence_history.write("Best Solution History: " + str(param_history) + "\n \n")
 convergence_history.write("Best Fitness History: " + str(fitness_history) + "\n")
 convergence_history.write("Run time: " + str(run_time) + " secs\n")
