@@ -203,8 +203,8 @@ bm_transf_tag_y = 4  # Beams oriented in Global-Y direction
 bm_mom_inertia_strong = np.array(list(nzs_beams['Ix']))
 
 # The geometric properties of the beams will be defined relative to the stiffness of the first floor beam
-base_Ix = 9975.573722316492  # No need to multiply by 'mm' or '1E6'
-slope_Ix_line = 0.004586197032942164
+base_Ix = 10367.365120546241  # No need to multiply by 'mm' or '1E6' 10367.365120546241, 0.0034690006234705515
+slope_Ix_line = 0.0034690006234705515
 col_group_heights = np.array([0, 6.2, 15.5, 24.8, 31])  # Height of column groups from the 1st floor
 
 # Assume linear relationship
@@ -406,6 +406,7 @@ def build_model():
     ops.nDMaterial('PlateFiber', plate_fiber_tag, nD_mattag)
     ops.section('LayeredShell', shell_sect_tag, 3, plate_fiber_tag, fiber_thick, plate_fiber_tag, fiber_thick, plate_fiber_tag, fiber_thick)
 
+    '''
     # Define geometric transformation for beams
     ops.geomTransf('PDelta', bm_transf_tag_x, 0, -1, 0)
     ops.geomTransf('PDelta', bm_transf_tag_y, 1, 0, 0)  # -1, 0, 0
@@ -413,6 +414,16 @@ def build_model():
     # Define geometric transformation for columns
     ops.geomTransf('PDelta', col_transf_tag_EW, 0, 1, 0)
     ops.geomTransf('PDelta', col_transf_tag_NS, 0, 1, 0)
+    '''
+
+    # Define geometric transformation for beams
+    ops.geomTransf('Linear', bm_transf_tag_x, 0, -1, 0)
+    ops.geomTransf('Linear', bm_transf_tag_y, 1, 0, 0)  # -1, 0, 0
+
+    # Define geometric transformation for columns
+    ops.geomTransf('Linear', col_transf_tag_EW, 0, 1, 0)
+    ops.geomTransf('Linear', col_transf_tag_NS, 0, 1, 0)
+
 
     # Define geometric transformation for rigid panel zone elements
     ops.geomTransf('Linear', pzone_transf_tag_col, 0, 1, 0)
@@ -534,7 +545,7 @@ if eigen:
     modal_prop = ops.modalProperties('-file', 'ModalReport_SMF.txt', '-unorm', '-return')
 
     # Apply Damping
-    damping_ratio = 0.025  # 2.5% Damping
+    damping_ratio = 0.05  # 5% Damping
 
     # Mass and stiffness proportional damping will be applied
     mass_prop_switch = 1.0
@@ -660,35 +671,22 @@ print('======================================================')
 # Compute Torsional Irregularity Ratio (TIR)
 # ============================================================================
 # Obtain peak total response for corner node displacments
-# ===== MRSA - X
-lower_left_corner_disp = modal_combo(np.loadtxt('./mrsa_results/dirX/lowerLeftCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
-mid_left_corner_disp = modal_combo(np.loadtxt('./mrsa_results/dirX/middleLeftCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
-mid_center_corner_disp = modal_combo(np.loadtxt('./mrsa_results/dirX/middleCenterCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
-upper_left_corner_disp = modal_combo(np.loadtxt('./mrsa_results/dirX/upperLeftCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
-upper_right_corner_disp = modal_combo(np.loadtxt('./mrsa_results/dirX/upperRightCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
-lower_right_corner_disp = modal_combo(np.loadtxt('./mrsa_results/dirX/lowerRightCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
 
-tir_x_edgeA = np.maximum(lower_left_corner_disp, mid_left_corner_disp) / (0.5*(lower_left_corner_disp + mid_left_corner_disp))
-tir_x_edgeB = np.maximum(mid_left_corner_disp, mid_center_corner_disp) / (0.5*(mid_left_corner_disp + mid_center_corner_disp))
-tir_x_edgeC = np.maximum(mid_center_corner_disp, upper_left_corner_disp) / (0.5*(mid_center_corner_disp + upper_left_corner_disp))
-tir_x_edgeD = np.maximum(upper_left_corner_disp, upper_right_corner_disp) / (0.5*(upper_left_corner_disp + upper_right_corner_disp))
-tir_x_edgeE = np.maximum(upper_right_corner_disp, lower_right_corner_disp) / (0.5*(upper_right_corner_disp + lower_right_corner_disp))
-tir_x_edgeF = np.maximum(lower_left_corner_disp, lower_right_corner_disp) / (0.5*(lower_left_corner_disp + lower_right_corner_disp))
+# ===== MRSA - X
+lower_left_corner_dispX = modal_combo(np.loadtxt('./mrsa_results/dirX/lowerLeftCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
+upper_right_corner_dispX = modal_combo(np.loadtxt('./mrsa_results/dirX/upperRightCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
+lower_right_corner_dispX = modal_combo(np.loadtxt('./mrsa_results/dirX/lowerRightCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
+
+tir_x_edgeE = np.maximum(upper_right_corner_dispX, lower_right_corner_dispX) / (0.5*(upper_right_corner_dispX + lower_right_corner_dispX))  # Right edge of building plan
+tir_x_edgeF = np.maximum(lower_left_corner_dispX, lower_right_corner_dispX) / (0.5*(lower_left_corner_dispX + lower_right_corner_dispX))    # Bottom edge of building plan
 
 # ===== MRSA - Y
 lower_left_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/lowerLeftCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
-mid_left_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/middleLeftCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
-mid_center_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/middleCenterCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
-upper_left_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/upperLeftCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
 upper_right_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/upperRightCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
 lower_right_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/lowerRightCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
 
-tir_y_edgeA = np.maximum(lower_left_corner_dispY, mid_left_corner_dispY) / (0.5*(lower_left_corner_dispY + mid_left_corner_dispY))
-tir_y_edgeB = np.maximum(mid_left_corner_dispY, mid_center_corner_dispY) / (0.5*(mid_left_corner_dispY + mid_center_corner_dispY))
-tir_y_edgeC = np.maximum(mid_center_corner_dispY, upper_left_corner_dispY) / (0.5*(mid_center_corner_dispY + upper_left_corner_dispY))
-tir_y_edgeD = np.maximum(upper_left_corner_dispY, upper_right_corner_dispY) / (0.5*(upper_left_corner_dispY + upper_right_corner_dispY))
-tir_y_edgeE = np.maximum(upper_right_corner_dispY, lower_right_corner_dispY) / (0.5*(upper_right_corner_dispY + lower_right_corner_dispY))
-tir_y_edgeF = np.maximum(lower_left_corner_dispY, lower_right_corner_dispY) / (0.5*(lower_left_corner_dispY + lower_right_corner_dispY))
+tir_y_edgeE = np.maximum(upper_right_corner_dispY, lower_right_corner_dispY) / (0.5*(upper_right_corner_dispY + lower_right_corner_dispY))  # Right edge of building plan
+tir_y_edgeF = np.maximum(lower_left_corner_dispY, lower_right_corner_dispY) / (0.5*(lower_left_corner_dispY + lower_right_corner_dispY))    # Bottom edge of building plan
 
 # ============================================================================
 # Post-process MRSA results
@@ -705,7 +703,7 @@ return_per_factor_sls = 0.25
 return_per_factor_uls = 1.3
 fault_factor = 1.0
 perform_factor = 0.7
-ductility_factor = 4.0  # SMF  4.0
+ductility_factor = 4.0  # SMF
 story_weights = np.array(list(total_floor_mass.values())) * grav_metric
 seismic_weight = story_weights.sum()
 
@@ -729,8 +727,8 @@ elf_mrsaY_scale_factor = max(elf_base_shear / mrsa_base_shearY, 1.0)
 kp  = 0.015 + 0.0075*(ductility_factor - 1)
 kp = min(max(0.0015, kp), 0.03)
 
-# pdelta_fac = (kp * seismic_weight + elf_base_shear) / elf_base_shear  # NZS 1170.5-2004: Sec 7.2.1.2 & 6.5.4.1
-pdelta_fac = 1
+pdelta_fac = (kp * seismic_weight + elf_base_shear) / elf_base_shear  # NZS 1170.5-2004: Sec 7.2.1.2 & 6.5.4.1
+# pdelta_fac = 1
 drift_modif_fac = 1.5  # NZS 1170.5-2004: Table 7.1
 
 # Compute story drifts
