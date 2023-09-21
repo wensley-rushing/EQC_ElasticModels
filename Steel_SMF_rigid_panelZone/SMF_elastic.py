@@ -203,8 +203,8 @@ bm_transf_tag_y = 4  # Beams oriented in Global-Y direction
 bm_mom_inertia_strong = np.array(list(nzs_beams['Ix']))
 
 # The geometric properties of the beams will be defined relative to the stiffness of the first floor beam
-base_Ix = 10367.365120546241  # No need to multiply by 'mm' or '1E6' 10367.365120546241, 0.0034690006234705515
-slope_Ix_line = 0.0034690006234705515
+base_Ix = 10367.365120546241  # No need to multiply by 'mm' or '1E6' 10367.365120546241
+slope_Ix_line = 0.0034690006234705515  # 0.0034690006234705515
 col_group_heights = np.array([0, 6.2, 15.5, 24.8, 31])  # Height of column groups from the 1st floor
 
 # Assume linear relationship
@@ -723,62 +723,95 @@ elf_mrsaY_scale_factor = max(elf_base_shear / mrsa_base_shearY, 1.0)
 # Check drift and stability requirements
 # ============================================================================
 
-# Deflection amplification factors
-kp  = 0.015 + 0.0075*(ductility_factor - 1)
-kp = min(max(0.0015, kp), 0.03)
+def check_drift_and_stability(drift_X_dir, drift_Y_dir):
 
-pdelta_fac = (kp * seismic_weight + elf_base_shear) / elf_base_shear  # NZS 1170.5-2004: Sec 7.2.1.2 & 6.5.4.1
-# pdelta_fac = 1
+    # CHECK DRIFT REQUIREMENTS
+    max_story_drift = max(drift_X_dir.max(), drift_Y_dir.max())
+    drift_ok = max_story_drift < 2.5  # Maximum story drift limit = 2.5%  NZS 1170.5:2004 - Sect 7.5.1
+
+    print('\nMaximum story drift: {:.2f}%'.format(max_story_drift))
+    if drift_ok:
+        print('Story drift requirements satisfied.')
+    else:
+        print('Story drift requirements NOT satisfied.')
+
+    # CHECK STABILITY REQUIREMENTS (P-DELTA) NZS 1170.5:2004 - Sect 6.5.1
+    thetaX = story_weights * 0.01 * drift_X_dir / (elf_force_distrib * story_heights)
+    thetaY = story_weights * 0.01 * drift_Y_dir / (elf_force_distrib * story_heights)
+
+    max_theta = max(thetaX.max(), thetaY.max())
+    theta_ok = max_theta < 0.3
+
+    print('\nMaximum stability coefficient: {:.2f}'.format(max_theta))
+    if theta_ok:
+        print('Stability requirements satisfied.')
+    else:
+        print('Stability requirements NOT satisfied.')
+
+
+# Load in COM displacements from MRSA
+mrsa_com_dispX = np.loadtxt('./mrsa_results/dirX/COM_dispX.txt')  # For MRSA in x-direction
+mrsa_com_dispY = np.loadtxt('./mrsa_results/dirY/COM_dispY.txt')  # For MRSA in y-direction
+
+# Drift amplification factor
 drift_modif_fac = 1.5  # NZS 1170.5-2004: Table 7.1
 
-# Compute story drifts
-# For MRSA in x-direction
-com_dispX = np.loadtxt('./mrsa_results/dirX/COM_dispX.txt')
-story_driftX = compute_story_drifts(com_dispX, story_heights, lambda_list, damping_ratio, num_modes)
+pdelta_method = "B"
 
-# For MRSA in y-direction
-com_dispY = np.loadtxt('./mrsa_results/dirY/COM_dispY.txt')
-story_driftY = compute_story_drifts(com_dispY, story_heights, lambda_list, damping_ratio, num_modes)
+if pdelta_method == "A":  # (NZS 1170.5:2004 - Sect. 6.5.4.1)
 
-# Amplify drifts by required factors
-story_driftX *=  (elf_mrsaX_scale_factor * ductility_factor * pdelta_fac * drift_modif_fac)
-story_driftY *=  (elf_mrsaY_scale_factor * ductility_factor * pdelta_fac * drift_modif_fac)
+    # Compute story drifts
+    story_driftX = compute_story_drifts(mrsa_com_dispX, story_heights, lambda_list, damping_ratio, num_modes)
+    story_driftY = compute_story_drifts(mrsa_com_dispY, story_heights, lambda_list, damping_ratio, num_modes)
 
-# CHECK DRIFT REQUIREMENTS
-max_story_drift = max(story_driftX.max(), story_driftY.max())
-drift_ok = max_story_drift < 2.5  # Maximum story drift limit = 2.5%  NZS 1170.5:2004 - Sect 7.5.1
+    # Scale drifts by elf-to-mrsa base shear factor # NZS 1170.5-2004: Sect 5.2.2.2b
+    story_driftX *= elf_mrsaX_scale_factor
+    story_driftY *= elf_mrsaY_scale_factor
 
-print('\nMaximum story drift: {:.2f}%'.format(max_story_drift))
-if drift_ok:
-    print('Story drift requirements satisfied.')
-else:
-    print('Story drift requirements NOT satisfied.')
+    kp  = 0.015 + 0.0075*(ductility_factor - 1)
+    kp = min(max(0.0015, kp), 0.03)
+    pdelta_fac = (kp * seismic_weight + elf_base_shear) / elf_base_shear  # NZS 1170.5-2004: Sec 7.2.1.2 & 6.5.4.1
+    # pdelta_fac = 1
 
-# CHECK STABILITY REQUIREMENTS (P-DELTA) NZS 1170.5:2004 - Sect 6.5.1
-thetaX = story_weights * 0.01 * story_driftX / (elf_force_distrib * story_heights)
-thetaY = story_weights * 0.01 * story_driftY / (elf_force_distrib * story_heights)
+    # Amplify drifts by required factors
+    story_driftX *=  (ductility_factor * pdelta_fac * drift_modif_fac)
+    story_driftY *=  (ductility_factor * pdelta_fac * drift_modif_fac)
 
-max_theta = max(thetaX.max(), thetaY.max())
-theta_ok = max_theta < 0.3
+    check_drift_and_stability(story_driftX, story_driftY)
 
-print('\nMaximum stability coefficient: {:.2f}'.format(max_theta))
-if theta_ok:
-    print('Stability requirements satisfied.')
-else:
-    print('Stability requirements NOT satisfied.')
+else: # Method B (NZS 1170.5:2004 - Sect. 6.5.4.2 & Commentary Sect. C6.5.4.2)
+
+    # Modal combination on peak COM displacements from MRSA
+    mrsa_total_com_dispX = modal_combo(mrsa_com_dispX, lambda_list, damping_ratio, num_modes)
+    mrsa_total_com_dispY = modal_combo(mrsa_com_dispY, lambda_list, damping_ratio, num_modes)
+
+    # Scale COM displacements by elf-to-mrsa base shear factor # NZS 1170.5-2004: Sect 5.2.2.2b
+    mrsa_total_com_dispX *= elf_mrsaX_scale_factor
+    mrsa_total_com_dispY *= elf_mrsaY_scale_factor
+
+    # Amplify COM displacements by ductility factor
+    # NZS 1170.5:2004 Commentary Sect. C6.5.4.2 Step 2
+    mrsa_total_com_dispX *= ductility_factor
+    mrsa_total_com_dispY *= ductility_factor
+
+    # Compute interstory displacements
+    inter_story_dispX = np.insert(np.diff(mrsa_total_com_dispX), 0, mrsa_total_com_dispX[0])
+    inter_story_dispY = np.insert(np.diff(mrsa_total_com_dispY), 0, mrsa_total_com_dispY[0])
+
+    # Compute story shear force due to PDelta actions
+    # NZS 1170.5:2004 Commentary Sect. C6.5.4.2 Step 3a
+    story_shear_forceX  = story_weights * inter_story_dispX / story_heights
+    story_shear_forceY  = story_weights * inter_story_dispY / story_heights
+
+    # Compute lateral forces to be used in static analysis for PDelta effects
+    # NZS 1170.5:2004 Commentary Sect. C6.5.4.2 Step 3b
+    lateral_forces_pDeltaX = np.insert(np.diff(story_shear_forceX), 0, story_shear_forceX[0])
+    lateral_forces_pDeltaY = np.insert(np.diff(story_shear_forceY), 0, story_shear_forceY[0])
 
 
-print('\nBeam sections: ', bm_sections)
-print('\nColumn sections: ', col_sections)
-
-# CHECK STRENGTH REQUIREMENTS
-
-
-
-'NEED TO SATISFY DRIFT, STABILITY & STRENGTH REQUIREMENTS BEFORE DOING THIS'
-# ============================================================================
-# Perform static analysis for accidental torsional moment
-# ============================================================================
+# ===================================================================================================
+# Perform static analysis for accidental torsional moment & PDelta effects - method B (if applicable)
+# ===================================================================================================
 floor_dimen_x = 29.410 * m
 floor_dimen_y = 31.025 * m
 
@@ -817,13 +850,19 @@ for ii in range(len(torsional_direc)):
         ops.timeSeries('Constant', ts_tag)
         ops.pattern('Plain', pattern_tag, ts_tag)
 
-        # # Loop through each COM node and apply torsional moment
+        # Loop through each COM node and apply torsional moment & PDelta lateral force if applicable
         for kk in range(len(com_nodes)):
-            if torsional_direc[ii] == 'X':  # Torsional moment applied about x-axis
+            if torsional_direc[ii] == 'X' and pdelta_method == "A":  # Only torsional moment is applied about z-axis
                 ops.load(com_nodes[kk], 0., 0., 0., 0., 0., torsional_mom_x[kk] * torsional_sign[jj])
 
-            else:  # Torsional moment applied about y-axis
+            elif torsional_direc[ii] == 'X' and pdelta_method == "B": # Torsional moment about z-axis & PDelta "Method B" forces are applied
+                ops.load(com_nodes[kk], lateral_forces_pDeltaX[kk], 0., 0., 0., 0., torsional_mom_x[kk] * torsional_sign[jj])
+
+            elif torsional_direc[ii] == 'Y' and pdelta_method == "A":  # Only torsional moment is applied about z-axis
                 ops.load(com_nodes[kk], 0., 0., 0., 0., 0., torsional_mom_y[kk] * torsional_sign[jj])
+
+            elif torsional_direc[ii] == 'Y' and pdelta_method == "B":  # Torsional moment about z-axis & PDelta "Method B" forces are applied
+                ops.load(com_nodes[kk], 0., lateral_forces_pDeltaY[kk], 0., 0., 0., torsional_mom_y[kk] * torsional_sign[jj])
 
         # Create directory to save results
         accident_torsion_res_folder = './accidental_torsion_results/' + torsional_folder[jj] + torsional_direc[ii] + '/'
@@ -855,6 +894,9 @@ for ii in range(len(torsional_direc)):
         ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor10_colResp.txt', '-precision', 9, '-region', 310, 'force')
         ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor11_colResp.txt', '-precision', 9, '-region', 311, 'force')
 
+        # Recorders for COM displacement
+        ops.recorder('Node', '-file', accident_torsion_res_folder + 'COM_disp' + torsional_direc[ii] + '.txt', '-node', *list(com_node_tags.values()), '-dof', elf_dof[ii], 'disp')
+
         # Base shear
         ops.recorder('Node', '-file', accident_torsion_res_folder + 'baseShear' + torsional_direc[ii] + '.txt', '-node',
                       *smf_node_tags['00'].tolist(), '-dof', elf_dof[ii], 'reaction')  # Fx or Fy
@@ -882,6 +924,64 @@ for ii in range(len(torsional_direc)):
 
 print('\nStatic analysis for accidental torsion completed...')
 
+if pdelta_method == "B":
+
+    # Process drifts due to PDelta lateral forces
+    pdelta_com_disp_posX = np.loadtxt('./accidental_torsion_results/positiveX/COM_dispX.txt')
+    pdelta_com_disp_negX = np.loadtxt('./accidental_torsion_results/negativeX/COM_dispX.txt')
+    pdelta_com_disp_posY = np.loadtxt('./accidental_torsion_results/positiveY/COM_dispY.txt')
+    pdelta_com_disp_negY = np.loadtxt('./accidental_torsion_results/negativeY/COM_dispY.txt')
+
+    pdelta_com_dispX = np.maximum(pdelta_com_disp_posX, pdelta_com_disp_negX)
+    pdelta_com_dispY = np.maximum(pdelta_com_disp_posY, pdelta_com_disp_negY)
+
+    # Determine subsoil factor NZS 1170.5:2004 Sect. C6.5.4.2 Step 4
+    # Case study building is in site subclass C.
+    if periods[0] < 2.0:
+        subsoil_factor_K = 1.0
+    elif 2.0 <= periods[0] <= 4.0:
+        subsoil_factor_K = (6 - periods[0]) / 4
+    else:
+        subsoil_factor_K = 4
+
+
+    if ductility_factor <= 3.5:
+        subsoil_factor_beta = 2 * ductility_factor * subsoil_factor_K / 3.5
+    else:
+        subsoil_factor_beta = 2 * subsoil_factor_K
+
+    # When using method B, element demands need to be scaled up by subsoil_factor_beta
+    pdelta_fac = subsoil_factor_beta
+
+    # Amplify PDelta COM displacements by subsoil_factor_beta and ductility factor
+    pdelta_com_dispX *= (subsoil_factor_beta * ductility_factor)
+    pdelta_com_dispY *= (subsoil_factor_beta * ductility_factor)
+
+    # Add up COM displacements fropm MRSA & PDelta checks
+    total_com_dispX = mrsa_total_com_dispX + pdelta_com_dispX
+    total_com_dispY = mrsa_total_com_dispY + pdelta_com_dispY
+
+    # Compute total interstory displacements
+    total_inter_story_dispX = np.insert(np.diff(total_com_dispX), 0, total_com_dispX[0])
+    total_inter_story_dispY = np.insert(np.diff(total_com_dispY), 0, total_com_dispY[0])
+
+    # Compute story drift ratios
+    story_driftX  = total_inter_story_dispX / story_heights * 100
+    story_driftY  = total_inter_story_dispY / story_heights * 100
+
+    # Amplify story drift ration by drift factor
+    story_driftX *= drift_modif_fac
+    story_driftY *= drift_modif_fac
+
+    check_drift_and_stability(story_driftX, story_driftY)
+
+
+print('\nBeam sections: ', bm_sections)
+print('\nColumn sections: ', col_sections)
+
+# CHECK STRENGTH REQUIREMENTS
+
+
 # ============================================================================
 # Post-process MRSA & accidental torsion results
 # ============================================================================
@@ -894,15 +994,14 @@ beam_demandsY = process_beam_col_resp('beam', './mrsa_results/dirY/', './acciden
                                       num_modes, elf_mrsaY_scale_factor, pdelta_fac)
 
 col_demandsX = process_beam_col_resp('col', './mrsa_results/dirX/', './accidental_torsion_results/positiveX/',
-                                     './accidental_torsion_results/negativeX/', lambda_list, damping_ratio,
-                                     num_modes, elf_mrsaX_scale_factor, pdelta_fac)
+                                      './accidental_torsion_results/negativeX/', lambda_list, damping_ratio,
+                                      num_modes, elf_mrsaX_scale_factor, pdelta_fac)
 
 col_demandsY = process_beam_col_resp('col', './mrsa_results/dirY/', './accidental_torsion_results/positiveY/',
-                                     './accidental_torsion_results/negativeY/', lambda_list, damping_ratio, num_modes,
-                                     elf_mrsaY_scale_factor, pdelta_fac)
+                                      './accidental_torsion_results/negativeY/', lambda_list, damping_ratio, num_modes,
+                                      elf_mrsaY_scale_factor, pdelta_fac)
 
 # Base shear due to static accidental torsion analysis
-# These should basically equal zero, as only moments are applied about the z-axis for the static analyses.
 accid_torsion_baseShear_pos_X = np.loadtxt('./accidental_torsion_results/positiveX/baseShearX.txt').sum()
 accid_torsion_baseShear_neg_X = np.loadtxt('./accidental_torsion_results/negativeX/baseShearX.txt').sum()
 

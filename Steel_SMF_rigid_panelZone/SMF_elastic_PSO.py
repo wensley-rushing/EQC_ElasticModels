@@ -781,7 +781,7 @@ print('Objective function value:', fitness_global_best_particle_position)
 run_time = time.time() - init_time
 print("\nRun time:  {} secs".format(run_time))
 
-convergence_history = open("./optimization_results/SMF_nzs_99.txt", 'w+')
+convergence_history = open("./optimization_results/SMF_nzs_correct_drift.txt", 'w+')
 convergence_history.write("Best Solution History: " + str(param_history) + "\n \n")
 convergence_history.write("Best Fitness History: " + str(fitness_history) + "\n")
 convergence_history.write("Run time: " + str(run_time) + " secs\n")
