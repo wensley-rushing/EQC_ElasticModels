@@ -182,3 +182,12 @@ optimization_results/
 
 # .xlsx files
 *.xlsx
+
+# PNG files
+*.png
+
+# .txt files
+*.txt
+
+#.docx files
+*.docx

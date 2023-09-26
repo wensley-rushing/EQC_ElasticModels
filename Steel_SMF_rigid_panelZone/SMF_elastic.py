@@ -12,6 +12,9 @@ import time
 import openseespy.opensees as ops
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+from matplotlib.ticker import StrMethodFormatter
 
 # Append directory of helper functions to Pyhton Path
 sys.path.append('../')
@@ -26,6 +29,24 @@ from helper_functions.cqc_modal_combo import modal_combo
 from helper_functions.elf_new_zealand import nz_horiz_seismic_shear, nz_horiz_force_distribution
 from helper_functions.get_spectral_shape_factor import spectral_shape_fac
 
+# Set plotting parameters
+mpl.rcParams['axes.edgecolor'] = 'grey'
+mpl.rcParams['lines.markeredgewidth'] = 0.4
+mpl.rcParams['lines.markeredgecolor'] = 'k'
+plt.rcParams.update({'font.family': 'Times New Roman'})
+
+axes_font = {'family': "sans-serif",
+              'color': 'black',
+              'size': 8
+              }
+
+title_font = {'family': 'sans-serif',
+              'color': 'black',
+              'weight': 'bold',
+              'size': 8}
+
+legend_font = {'family': 'Times New Roman',
+              'size': 8}
 
 # Define Units
 sec = 1
@@ -72,6 +93,8 @@ roof_flr = flr10 + typ_flr_height
 
 story_heights = np.array([flr1, typ_flr_height, typ_flr_height, typ_flr_height, typ_flr_height, typ_flr_height,
                  typ_flr_height, typ_flr_height, typ_flr_height, typ_flr_height, typ_flr_height]) # Story heights from Floor 1 to Roof
+
+elev = [flr1, flr2, flr3, flr4, flr5, flr6, flr7, flr8, flr9, flr10, roof_flr]
 
 # Column centerline x-y coordinates in meters
 smf_coords_dict = {'col1': [0, 0],
@@ -203,14 +226,12 @@ bm_transf_tag_y = 4  # Beams oriented in Global-Y direction
 bm_mom_inertia_strong = np.array(list(nzs_beams['Ix']))
 
 # The geometric properties of the beams will be defined relative to the stiffness of the first floor beam
-base_Ix = 10367.365120546241  # No need to multiply by 'mm' or '1E6' 10367.365120546241
-slope_Ix_line = 0.0034690006234705515  # 0.0034690006234705515
+base_Ix = 9752.529562607646  # No need to multiply by 'mm' or '1E6' 10367.365120546241
+slope_Ix_line = 1/31  # 0.0035511206867118853
 col_group_heights = np.array([0, 6.2, 15.5, 24.8, 31])  # Height of column groups from the 1st floor
 
 # Assume linear relationship
 # Base Ix & slope
-# bm_Ix_modif = [1, 1, 1, 1, 1]
-# bm_Ix_modif = [1, 0.8, 0.6, 0.5, 0.4]
 bm_Ix_modif = 1 - slope_Ix_line*col_group_heights
 
 bm_sect_flr_1 = nzs_beams.loc[nzs_beams.index[nzs_beams['Ix'] >= bm_Ix_modif[0] * base_Ix].tolist()[-1]]
@@ -950,6 +971,8 @@ if pdelta_method == "B":
     else:
         subsoil_factor_beta = 2 * subsoil_factor_K
 
+    subsoil_factor_beta = max(subsoil_factor_beta, 1.0)
+
     # When using method B, element demands need to be scaled up by subsoil_factor_beta
     pdelta_fac = subsoil_factor_beta
 
@@ -981,6 +1004,9 @@ print('\nColumn sections: ', col_sections)
 
 # CHECK STRENGTH REQUIREMENTS
 
+# Save story drifts
+np.savetxt('driftX-PDeltaMethod{}.txt'.format(pdelta_method), story_driftX, fmt='%.2f')
+np.savetxt('driftY-PDeltaMethod{}.txt'.format(pdelta_method), story_driftY, fmt='%.2f')
 
 # ============================================================================
 # Post-process MRSA & accidental torsion results
@@ -1010,3 +1036,38 @@ accid_torsion_baseShear_neg_Y = np.loadtxt('./accidental_torsion_results/negativ
 
 base_shearX = max((mrsa_base_shearX + accid_torsion_baseShear_pos_X), (mrsa_base_shearX + accid_torsion_baseShear_neg_X))
 base_shearY = max((mrsa_base_shearY + accid_torsion_baseShear_pos_Y), (mrsa_base_shearY + accid_torsion_baseShear_neg_Y))
+
+# Generate story drift plots
+fig, ax = plt.subplots(1, 2, figsize=(6.0, 7.5), sharey=True, constrained_layout=True)
+fig.suptitle('Story drift ratios - PDelta Method {}'.format(pdelta_method), fontdict=title_font)
+
+ax[0].vlines(story_driftX[0], 0.0, elev[0])
+ax[1].vlines(story_driftY[0], 0.0, elev[0])
+
+for ii in range(1, len(story_driftX)):
+    ax[0].hlines(elev[ii-1], story_driftX[ii-1], story_driftX[ii])
+    ax[0].vlines(story_driftX[ii],  elev[ii-1], elev[ii])
+
+    ax[1].hlines(elev[ii-1], story_driftY[ii-1], story_driftY[ii])  # Correct
+    ax[1].vlines(story_driftY[ii],  elev[ii-1], elev[ii])
+
+
+ax[0].set_title('X - Direction', fontsize=12, family='Times New Roman')
+ax[1].set_title('Y- Direction', fontsize=12, family='Times New Roman')
+
+ax[0].set_ylabel('Story elevation (m)', fontdict=axes_font)
+
+for axx in ax.flat:
+    axx.set_xlim(0.0)
+    axx.set_ylim(0.0)
+
+    axx.grid(True, which='major', axis='both', ls='-.', linewidth=0.6)
+
+    axx.set_yticks(elev)
+
+    axx.set_xlabel('Story drift ratio (%)', fontdict=axes_font)
+
+    axx.yaxis.set_major_formatter(StrMethodFormatter('{x:,.1f}'))
+    axx.tick_params(axis='both', direction='in', colors='grey', labelcolor='grey', zorder=3.0, labelsize=8.0)
+
+# plt.savefig('DriftPlots-PDeltaMethod{}.png'.format(pdelta_method), dpi=1200)
