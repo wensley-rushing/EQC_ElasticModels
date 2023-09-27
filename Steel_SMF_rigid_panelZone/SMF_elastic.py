@@ -1011,19 +1011,19 @@ np.savetxt('driftY-PDeltaMethod{}.txt'.format(pdelta_method), story_driftY, fmt=
 # ============================================================================
 # Post-process MRSA & accidental torsion results
 # ============================================================================
-beam_demandsX = process_beam_col_resp('beam', './mrsa_results/dirX/', './accidental_torsion_results/positiveX/',
+beam_demands_X = process_beam_col_resp('beam', './mrsa_results/dirX/', './accidental_torsion_results/positiveX/',
                                       './accidental_torsion_results/negativeX/', lambda_list, damping_ratio,
                                       num_modes, elf_mrsaX_scale_factor, pdelta_fac)
 
-beam_demandsY = process_beam_col_resp('beam', './mrsa_results/dirY/', './accidental_torsion_results/positiveY/',
+beam_demands_Y = process_beam_col_resp('beam', './mrsa_results/dirY/', './accidental_torsion_results/positiveY/',
                                       './accidental_torsion_results/negativeY/', lambda_list, damping_ratio,
                                       num_modes, elf_mrsaY_scale_factor, pdelta_fac)
 
-col_demandsX = process_beam_col_resp('col', './mrsa_results/dirX/', './accidental_torsion_results/positiveX/',
+col_demands_X = process_beam_col_resp('col', './mrsa_results/dirX/', './accidental_torsion_results/positiveX/',
                                       './accidental_torsion_results/negativeX/', lambda_list, damping_ratio,
                                       num_modes, elf_mrsaX_scale_factor, pdelta_fac)
 
-col_demandsY = process_beam_col_resp('col', './mrsa_results/dirY/', './accidental_torsion_results/positiveY/',
+col_demands_Y = process_beam_col_resp('col', './mrsa_results/dirY/', './accidental_torsion_results/positiveY/',
                                       './accidental_torsion_results/negativeY/', lambda_list, damping_ratio, num_modes,
                                       elf_mrsaY_scale_factor, pdelta_fac)
 
@@ -1034,8 +1034,8 @@ accid_torsion_baseShear_neg_X = np.loadtxt('./accidental_torsion_results/negativ
 accid_torsion_baseShear_pos_Y = np.loadtxt('./accidental_torsion_results/positiveY/baseShearY.txt').sum()
 accid_torsion_baseShear_neg_Y = np.loadtxt('./accidental_torsion_results/negativeY/baseShearY.txt').sum()
 
-base_shearX = max((mrsa_base_shearX + accid_torsion_baseShear_pos_X), (mrsa_base_shearX + accid_torsion_baseShear_neg_X))
-base_shearY = max((mrsa_base_shearY + accid_torsion_baseShear_pos_Y), (mrsa_base_shearY + accid_torsion_baseShear_neg_Y))
+base_shear_X = max((mrsa_base_shearX + accid_torsion_baseShear_pos_X), (mrsa_base_shearX + accid_torsion_baseShear_neg_X))
+base_shear_Y = max((mrsa_base_shearY + accid_torsion_baseShear_pos_Y), (mrsa_base_shearY + accid_torsion_baseShear_neg_Y))
 
 # Generate story drift plots
 fig, ax = plt.subplots(1, 2, figsize=(6.0, 7.5), sharey=True, constrained_layout=True)

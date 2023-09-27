@@ -1206,22 +1206,26 @@ np.savetxt('driftY-PDeltaMethod{}.txt'.format(pdelta_method), story_driftY, fmt=
 # ============================================================================
 # Post-process MRSA & accidental torsion results
 # ============================================================================
-col_demandsX = process_beam_col_resp('col', './mrsa_results/dirX/', './accidental_torsion_results/positiveX/',
+col_demands_X = process_beam_col_resp('col', './mrsa_results/dirX/', './accidental_torsion_results/positiveX/',
                                       './accidental_torsion_results/negativeX/', lambda_list, damping_ratio,
                                       num_modes, elf_mrsaX_scale_factor, pdelta_fac)
 
-col_demandsY = process_beam_col_resp('col', './mrsa_results/dirY/', './accidental_torsion_results/positiveY/',
+col_demands_Y = process_beam_col_resp('col', './mrsa_results/dirY/', './accidental_torsion_results/positiveY/',
                                       './accidental_torsion_results/negativeY/', lambda_list, damping_ratio,
                                       num_modes, elf_mrsaY_scale_factor, pdelta_fac)
 
-wall_demandsX = process_beam_col_resp('wall', './mrsa_results/dirX/', './accidental_torsion_results/positiveX/',
+wall_demands_X, wall_axialLoad_X = process_beam_col_resp('wall', './mrsa_results/dirX/', './accidental_torsion_results/positiveX/',
                                       './accidental_torsion_results/negativeX/', lambda_list, damping_ratio,
                                       num_modes, elf_mrsaX_scale_factor, pdelta_fac)
 
-wall_demandsY = process_beam_col_resp('wall', './mrsa_results/dirY/', './accidental_torsion_results/positiveY/',
+wall_demands_Y, wall_axialLoad_Y = process_beam_col_resp('wall', './mrsa_results/dirY/', './accidental_torsion_results/positiveY/',
                                       './accidental_torsion_results/negativeY/', lambda_list, damping_ratio,
                                       num_modes, elf_mrsaY_scale_factor, pdelta_fac)
 
+# Compute wall axial load ratios
+wall_sect_area = wall_prop[:, 0] * wall_prop[:, 1]
+wall_alr_X = wall_axialLoad_X.divide(wall_sect_area * conc_fcp, axis='columns') * 100
+wall_alr_Y = wall_axialLoad_Y.divide(wall_sect_area * conc_fcp, axis='columns') * 100
 
 # Base shear due to static accidental torsion analysis
 accid_torsion_baseShear_pos_X = np.loadtxt('./accidental_torsion_results/positiveX/baseShearX.txt').sum()

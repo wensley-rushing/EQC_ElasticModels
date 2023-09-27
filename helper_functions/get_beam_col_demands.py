@@ -147,6 +147,7 @@ def process_beam_col_resp(elem_type, mrsa_resp_folder, pos_torsion_resp_folder, 
     pk_total_resp_flr_10 = modal_combo(pk_modal_resp_flr_10, angular_freq, damp_ratio, num_modes) * elf_mrsa_scale_factor
     pk_total_resp_flr_11 = modal_combo(pk_modal_resp_flr_11, angular_freq, damp_ratio, num_modes) * elf_mrsa_scale_factor
 
+
     # Load in results from static accidental torsion analysis
     # Positive eccentricity
     pos_torsion_resp_flr_01 = np.loadtxt(pos_torsion_resp_folder + 'floor01_' + elem_type + 'Resp.txt')
@@ -174,6 +175,24 @@ def process_beam_col_resp(elem_type, mrsa_resp_folder, pos_torsion_resp_folder, 
     neg_torsion_resp_flr_10 = np.loadtxt(neg_torsion_resp_folder + 'floor10_' + elem_type + 'Resp.txt')
     neg_torsion_resp_flr_11 = np.loadtxt(neg_torsion_resp_folder + 'floor11_' + elem_type + 'Resp.txt')
 
+    # Extract axial loads in each wall i.e. Fz. (MRSA + Accidental torsional results)
+    if elem_type =='wall':
+        wall_axial_loads = {'Floor 1': np.maximum(pk_total_resp_flr_01[2::12] + pos_torsion_resp_flr_01[2::12], pk_total_resp_flr_01[2::12] + neg_torsion_resp_flr_01[2::12]),
+                            'Floor 2': np.maximum(pk_total_resp_flr_02[2::12] + pos_torsion_resp_flr_02[2::12], pk_total_resp_flr_02[2::12] + neg_torsion_resp_flr_02[2::12]),
+                            'Floor 3': np.maximum(pk_total_resp_flr_03[2::12] + pos_torsion_resp_flr_03[2::12], pk_total_resp_flr_03[2::12] + neg_torsion_resp_flr_03[2::12]),
+                            'Floor 4': np.maximum(pk_total_resp_flr_04[2::12] + pos_torsion_resp_flr_04[2::12], pk_total_resp_flr_04[2::12] + neg_torsion_resp_flr_04[2::12]),
+                            'Floor 5': np.maximum(pk_total_resp_flr_05[2::12] + pos_torsion_resp_flr_05[2::12], pk_total_resp_flr_05[2::12] + neg_torsion_resp_flr_05[2::12]),
+                            'Floor 6': np.maximum(pk_total_resp_flr_06[2::12] + pos_torsion_resp_flr_06[2::12], pk_total_resp_flr_06[2::12] + neg_torsion_resp_flr_06[2::12]),
+                            'Floor 7': np.maximum(pk_total_resp_flr_07[2::12] + pos_torsion_resp_flr_07[2::12], pk_total_resp_flr_07[2::12] + neg_torsion_resp_flr_07[2::12]),
+                            'Floor 8': np.maximum(pk_total_resp_flr_08[2::12] + pos_torsion_resp_flr_08[2::12], pk_total_resp_flr_08[2::12] + neg_torsion_resp_flr_08[2::12]),
+                            'Floor 9': np.maximum(pk_total_resp_flr_09[2::12] + pos_torsion_resp_flr_09[2::12], pk_total_resp_flr_09[2::12] + neg_torsion_resp_flr_09[2::12]),
+                            'Floor 10': np.maximum(pk_total_resp_flr_10[2::12] + pos_torsion_resp_flr_10[2::12], pk_total_resp_flr_10[2::12] + neg_torsion_resp_flr_10[2::12]),
+                            'Floor 11': np.maximum(pk_total_resp_flr_11[2::12] + pos_torsion_resp_flr_11[2::12], pk_total_resp_flr_11[2::12] + neg_torsion_resp_flr_11[2::12])}
+
+
+        wall_axial_loads = pd.DataFrame(wall_axial_loads, index=['Wall_1', 'Wall_2', 'Wall_3', 'Wall_4', 'Wall_5',
+                                                                 'Wall_6', 'Wall_7', 'Wall_8', 'Wall_9', 'Wall_10']).transpose()
+
     # Extract maximum shear force and bending moment for each floor
     Fx_flr_01, Fy_flr_01, Fz_flr_01, Mx_flr_01, My_flr_01, Mz_flr_01 = get_max_shear_and_moment(pk_total_resp_flr_01, pos_torsion_resp_flr_01, neg_torsion_resp_flr_01, pdelta_fac)
     Fx_flr_02, Fy_flr_02, Fz_flr_02, Mx_flr_02, My_flr_02, Mz_flr_02 = get_max_shear_and_moment(pk_total_resp_flr_02, pos_torsion_resp_flr_02, neg_torsion_resp_flr_02, pdelta_fac)
@@ -188,34 +207,36 @@ def process_beam_col_resp(elem_type, mrsa_resp_folder, pos_torsion_resp_folder, 
     Fx_flr_11, Fy_flr_11, Fz_flr_11, Mx_flr_11, My_flr_11, Mz_flr_11 = get_max_shear_and_moment(pk_total_resp_flr_11, pos_torsion_resp_flr_11, neg_torsion_resp_flr_11, pdelta_fac)
 
     # Initialize dataframe to save maximum values
-    max_beam_demands = pd.DataFrame()
+    max_elem_demands = pd.DataFrame()
 
-    max_beam_demands['Floor'] = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11']
+    max_elem_demands['Floor'] = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11']
 
-    max_beam_demands['Fx (kN)'] = [Fx_flr_01, Fx_flr_02, Fx_flr_03, Fx_flr_04, Fx_flr_05,
+    max_elem_demands['Fx (kN)'] = [Fx_flr_01, Fx_flr_02, Fx_flr_03, Fx_flr_04, Fx_flr_05,
                                    Fx_flr_06, Fx_flr_07, Fx_flr_08, Fx_flr_09, Fx_flr_10,
                                    Fx_flr_11]
 
-    max_beam_demands['Fy (kN)'] = [Fy_flr_01, Fy_flr_02, Fy_flr_03, Fy_flr_04, Fy_flr_05,
+    max_elem_demands['Fy (kN)'] = [Fy_flr_01, Fy_flr_02, Fy_flr_03, Fy_flr_04, Fy_flr_05,
                                    Fy_flr_06, Fy_flr_07, Fy_flr_08, Fy_flr_09, Fy_flr_10,
                                    Fy_flr_11]
 
-    max_beam_demands['Fz (kN)'] = [Fz_flr_01, Fz_flr_02, Fz_flr_03, Fz_flr_04, Fz_flr_05,
+    max_elem_demands['Fz (kN)'] = [Fz_flr_01, Fz_flr_02, Fz_flr_03, Fz_flr_04, Fz_flr_05,
                                    Fz_flr_06, Fz_flr_07, Fz_flr_08, Fz_flr_09, Fz_flr_10,
                                    Fz_flr_11]
 
-    max_beam_demands['Mx (kN-m)'] = [Mx_flr_01, Mx_flr_02, Mx_flr_03, Mx_flr_04, Mx_flr_05,
+    max_elem_demands['Mx (kN-m)'] = [Mx_flr_01, Mx_flr_02, Mx_flr_03, Mx_flr_04, Mx_flr_05,
                                    Mx_flr_06, Mx_flr_07, Mx_flr_08, Mx_flr_09, Mx_flr_10,
                                    Mx_flr_11]
 
-    max_beam_demands['My (kN-m)'] = [My_flr_01, My_flr_02, My_flr_03, My_flr_04, My_flr_05,
+    max_elem_demands['My (kN-m)'] = [My_flr_01, My_flr_02, My_flr_03, My_flr_04, My_flr_05,
                                    My_flr_06, My_flr_07, My_flr_08, My_flr_09, My_flr_10,
                                    My_flr_11]
 
-    max_beam_demands['Mz (kN-m)'] = [Mz_flr_01, Mz_flr_02, Mz_flr_03, Mz_flr_04, Mz_flr_05,
+    max_elem_demands['Mz (kN-m)'] = [Mz_flr_01, Mz_flr_02, Mz_flr_03, Mz_flr_04, Mz_flr_05,
                                    Mz_flr_06, Mz_flr_07, Mz_flr_08, Mz_flr_09, Mz_flr_10,
                                    Mz_flr_11]
-
-    return(max_beam_demands)
+    if elem_type =='wall':
+        return(max_elem_demands, wall_axial_loads)
+    else:
+        return(max_elem_demands)
 
 
