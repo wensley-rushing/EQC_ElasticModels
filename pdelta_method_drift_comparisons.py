@@ -80,7 +80,7 @@ def generate_drift_plots(drift_results_direc):
     story_driftX_pDel_B = np.loadtxt(drift_results_direc + 'driftX-PDeltaMethodB.txt')
     story_driftY_pDel_B = np.loadtxt(drift_results_direc + 'driftY-PDeltaMethodB.txt')
 
-    fig, ax = plt.subplots(1, 2, figsize=(6.0, 7.5), sharey=True, constrained_layout=True)
+    fig, ax = plt.subplots(1, 2, figsize=(6.0, 7.5), sharex=True, sharey=True, constrained_layout=True)
     fig.suptitle('Story drift ratios using PDelta methods A & B', fontdict=title_font)
 
     ax[0].vlines(story_driftX_pDel_A[0], 0.0, elev[0], color='#f1a340', label='Method A')

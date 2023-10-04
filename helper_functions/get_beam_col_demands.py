@@ -175,8 +175,8 @@ def process_beam_col_resp(elem_type, mrsa_resp_folder, pos_torsion_resp_folder, 
     neg_torsion_resp_flr_10 = np.loadtxt(neg_torsion_resp_folder + 'floor10_' + elem_type + 'Resp.txt')
     neg_torsion_resp_flr_11 = np.loadtxt(neg_torsion_resp_folder + 'floor11_' + elem_type + 'Resp.txt')
 
-    # Extract axial loads in each wall i.e. Fz. (MRSA + Accidental torsional results)
-    if elem_type =='wall':
+    # Extract axial loads in each wall (i.e., Fz. from most critical combo of MRSA + Accidental torsional results)
+    if elem_type == 'wall':
         wall_axial_loads = {'Floor 1': np.maximum(pk_total_resp_flr_01[2::12] + pos_torsion_resp_flr_01[2::12], pk_total_resp_flr_01[2::12] + neg_torsion_resp_flr_01[2::12]),
                             'Floor 2': np.maximum(pk_total_resp_flr_02[2::12] + pos_torsion_resp_flr_02[2::12], pk_total_resp_flr_02[2::12] + neg_torsion_resp_flr_02[2::12]),
                             'Floor 3': np.maximum(pk_total_resp_flr_03[2::12] + pos_torsion_resp_flr_03[2::12], pk_total_resp_flr_03[2::12] + neg_torsion_resp_flr_03[2::12]),

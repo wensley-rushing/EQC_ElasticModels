@@ -1224,8 +1224,8 @@ wall_demands_Y, wall_axialLoad_Y = process_beam_col_resp('wall', './mrsa_results
 
 # Compute wall axial load ratios
 wall_sect_area = wall_prop[:, 0] * wall_prop[:, 1]
-wall_alr_X = wall_axialLoad_X.divide(wall_sect_area * conc_fcp, axis='columns') * 100
-wall_alr_Y = wall_axialLoad_Y.divide(wall_sect_area * conc_fcp, axis='columns') * 100
+wall_alr_X = (wall_axialLoad_X.divide(wall_sect_area * conc_fcp, axis='columns') * 100).round(2)
+wall_alr_Y = (wall_axialLoad_Y.divide(wall_sect_area * conc_fcp, axis='columns') * 100).round(2)
 
 # Base shear due to static accidental torsion analysis
 accid_torsion_baseShear_pos_X = np.loadtxt('./accidental_torsion_results/positiveX/baseShearX.txt').sum()
@@ -1238,7 +1238,7 @@ base_shearX = max((mrsa_base_shearX + accid_torsion_baseShear_pos_X), (mrsa_base
 base_shearY = max((mrsa_base_shearY + accid_torsion_baseShear_pos_Y), (mrsa_base_shearY + accid_torsion_baseShear_neg_Y))
 
 # Generate story drift plots
-fig, ax = plt.subplots(1, 2, figsize=(6.0, 7.5), sharey=True, constrained_layout=True)
+fig, ax = plt.subplots(1, 2, figsize=(6.0, 7.5), sharex=True, sharey=True, constrained_layout=True)
 fig.suptitle('Story drift ratios - PDelta Method {}'.format(pdelta_method), fontdict=title_font)
 
 ax[0].vlines(story_driftX[0], 0.0, elev[0])
@@ -1259,7 +1259,7 @@ ax[0].set_ylabel('Story elevation (m)', fontdict=axes_font)
 
 for axx in ax.flat:
     axx.set_xlim(0.0)
-    axx.set_ylim(0.0)
+    axx.set_ylim(0.0, elev[-1])
 
     axx.grid(True, which='major', axis='both', ls='-.', linewidth=0.6)
 

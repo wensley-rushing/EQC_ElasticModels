@@ -1038,7 +1038,7 @@ base_shear_X = max((mrsa_base_shearX + accid_torsion_baseShear_pos_X), (mrsa_bas
 base_shear_Y = max((mrsa_base_shearY + accid_torsion_baseShear_pos_Y), (mrsa_base_shearY + accid_torsion_baseShear_neg_Y))
 
 # Generate story drift plots
-fig, ax = plt.subplots(1, 2, figsize=(6.0, 7.5), sharey=True, constrained_layout=True)
+fig, ax = plt.subplots(1, 2, figsize=(6.0, 7.5), sharex=True, sharey=True, constrained_layout=True)
 fig.suptitle('Story drift ratios - PDelta Method {}'.format(pdelta_method), fontdict=title_font)
 
 ax[0].vlines(story_driftX[0], 0.0, elev[0])
@@ -1059,7 +1059,7 @@ ax[0].set_ylabel('Story elevation (m)', fontdict=axes_font)
 
 for axx in ax.flat:
     axx.set_xlim(0.0)
-    axx.set_ylim(0.0)
+    axx.set_ylim(0.0, elev[-1])
 
     axx.grid(True, which='major', axis='both', ls='-.', linewidth=0.6)
 
