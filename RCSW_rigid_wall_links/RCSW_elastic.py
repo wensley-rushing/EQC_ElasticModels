@@ -1214,11 +1214,11 @@ col_demands_Y = process_beam_col_resp('col', './mrsa_results/dirY/', './accident
                                       './accidental_torsion_results/negativeY/', lambda_list, damping_ratio,
                                       num_modes, elf_mrsaY_scale_factor, pdelta_fac)
 
-wall_demands_X, wall_axialLoad_X = process_beam_col_resp('wall', './mrsa_results/dirX/', './accidental_torsion_results/positiveX/',
+wall_demands_X, wall_axialLoad_X, wall_mom_X = process_beam_col_resp('wall', './mrsa_results/dirX/', './accidental_torsion_results/positiveX/',
                                       './accidental_torsion_results/negativeX/', lambda_list, damping_ratio,
                                       num_modes, elf_mrsaX_scale_factor, pdelta_fac)
 
-wall_demands_Y, wall_axialLoad_Y = process_beam_col_resp('wall', './mrsa_results/dirY/', './accidental_torsion_results/positiveY/',
+wall_demands_Y, wall_axialLoad_Y, wall_mom_Y = process_beam_col_resp('wall', './mrsa_results/dirY/', './accidental_torsion_results/positiveY/',
                                       './accidental_torsion_results/negativeY/', lambda_list, damping_ratio,
                                       num_modes, elf_mrsaY_scale_factor, pdelta_fac)
 

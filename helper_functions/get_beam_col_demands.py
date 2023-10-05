@@ -175,7 +175,7 @@ def process_beam_col_resp(elem_type, mrsa_resp_folder, pos_torsion_resp_folder, 
     neg_torsion_resp_flr_10 = np.loadtxt(neg_torsion_resp_folder + 'floor10_' + elem_type + 'Resp.txt')
     neg_torsion_resp_flr_11 = np.loadtxt(neg_torsion_resp_folder + 'floor11_' + elem_type + 'Resp.txt')
 
-    # Extract axial loads in each wall (i.e., Fz. from most critical combo of MRSA + Accidental torsional results)
+    # Extract axial loads & Moments in each wall (i.e., Fz. from most critical combo of MRSA + Accidental torsional results)
     if elem_type == 'wall':
         wall_axial_loads = {'Floor 1': np.maximum(pk_total_resp_flr_01[2::12] + pos_torsion_resp_flr_01[2::12], pk_total_resp_flr_01[2::12] + neg_torsion_resp_flr_01[2::12]),
                             'Floor 2': np.maximum(pk_total_resp_flr_02[2::12] + pos_torsion_resp_flr_02[2::12], pk_total_resp_flr_02[2::12] + neg_torsion_resp_flr_02[2::12]),
@@ -189,9 +189,114 @@ def process_beam_col_resp(elem_type, mrsa_resp_folder, pos_torsion_resp_folder, 
                             'Floor 10': np.maximum(pk_total_resp_flr_10[2::12] + pos_torsion_resp_flr_10[2::12], pk_total_resp_flr_10[2::12] + neg_torsion_resp_flr_10[2::12]),
                             'Floor 11': np.maximum(pk_total_resp_flr_11[2::12] + pos_torsion_resp_flr_11[2::12], pk_total_resp_flr_11[2::12] + neg_torsion_resp_flr_11[2::12])}
 
+        # For moments, the moment at the base of each wall element (i.e. the i-node) would govern
+        wall_mom = {
+                    'Floor 1': np.max(np.abs(np.vstack((
+                                                        pk_total_resp_flr_01[3::12] + pos_torsion_resp_flr_01[3::12],
+                                                        pk_total_resp_flr_01[3::12] + neg_torsion_resp_flr_01[3::12],
+                                                        pk_total_resp_flr_01[4::12] + pos_torsion_resp_flr_01[4::12],
+                                                        pk_total_resp_flr_01[4::12] + neg_torsion_resp_flr_01[4::12],
+                                                        pk_total_resp_flr_01[5::12] + pos_torsion_resp_flr_01[5::12],
+                                                        pk_total_resp_flr_01[5::12] + neg_torsion_resp_flr_01[5::12]))), axis=0),
+
+
+                    'Floor 2': np.max(np.abs(np.vstack((
+                                                        pk_total_resp_flr_02[3::12] + pos_torsion_resp_flr_02[3::12],
+                                                        pk_total_resp_flr_02[3::12] + neg_torsion_resp_flr_02[3::12],
+                                                        pk_total_resp_flr_02[4::12] + pos_torsion_resp_flr_02[4::12],
+                                                        pk_total_resp_flr_02[4::12] + neg_torsion_resp_flr_02[4::12],
+                                                        pk_total_resp_flr_02[5::12] + pos_torsion_resp_flr_02[5::12],
+                                                        pk_total_resp_flr_02[5::12] + neg_torsion_resp_flr_02[5::12]))), axis=0),
+
+
+                    'Floor 3': np.max(np.abs(np.vstack((
+                                                        pk_total_resp_flr_03[3::12] + pos_torsion_resp_flr_03[3::12],
+                                                        pk_total_resp_flr_03[3::12] + neg_torsion_resp_flr_03[3::12],
+                                                        pk_total_resp_flr_03[4::12] + pos_torsion_resp_flr_03[4::12],
+                                                        pk_total_resp_flr_03[4::12] + neg_torsion_resp_flr_03[4::12],
+                                                        pk_total_resp_flr_03[5::12] + pos_torsion_resp_flr_03[5::12],
+                                                        pk_total_resp_flr_03[5::12] + neg_torsion_resp_flr_03[5::12]))), axis=0),
+
+
+                    'Floor 4': np.max(np.abs(np.vstack((
+                                                        pk_total_resp_flr_04[3::12] + pos_torsion_resp_flr_04[3::12],
+                                                        pk_total_resp_flr_04[3::12] + neg_torsion_resp_flr_04[3::12],
+                                                        pk_total_resp_flr_04[4::12] + pos_torsion_resp_flr_04[4::12],
+                                                        pk_total_resp_flr_04[4::12] + neg_torsion_resp_flr_04[4::12],
+                                                        pk_total_resp_flr_04[5::12] + pos_torsion_resp_flr_04[5::12],
+                                                        pk_total_resp_flr_04[5::12] + neg_torsion_resp_flr_04[5::12]))), axis=0),
+
+
+                    'Floor 5': np.max(np.abs(np.vstack((
+                                                        pk_total_resp_flr_05[3::12] + pos_torsion_resp_flr_05[3::12],
+                                                        pk_total_resp_flr_05[3::12] + neg_torsion_resp_flr_05[3::12],
+                                                        pk_total_resp_flr_05[4::12] + pos_torsion_resp_flr_05[4::12],
+                                                        pk_total_resp_flr_05[4::12] + neg_torsion_resp_flr_05[4::12],
+                                                        pk_total_resp_flr_05[5::12] + pos_torsion_resp_flr_05[5::12],
+                                                        pk_total_resp_flr_05[5::12] + neg_torsion_resp_flr_05[5::12]))), axis=0),
+
+
+                    'Floor 6': np.max(np.abs(np.vstack((
+                                                        pk_total_resp_flr_06[3::12] + pos_torsion_resp_flr_06[3::12],
+                                                        pk_total_resp_flr_06[3::12] + neg_torsion_resp_flr_06[3::12],
+                                                        pk_total_resp_flr_06[4::12] + pos_torsion_resp_flr_06[4::12],
+                                                        pk_total_resp_flr_06[4::12] + neg_torsion_resp_flr_06[4::12],
+                                                        pk_total_resp_flr_06[5::12] + pos_torsion_resp_flr_06[5::12],
+                                                        pk_total_resp_flr_06[5::12] + neg_torsion_resp_flr_06[5::12]))), axis=0),
+
+
+                    'Floor 7': np.max(np.abs(np.vstack((
+                                                        pk_total_resp_flr_07[3::12] + pos_torsion_resp_flr_07[3::12],
+                                                        pk_total_resp_flr_07[3::12] + neg_torsion_resp_flr_07[3::12],
+                                                        pk_total_resp_flr_07[4::12] + pos_torsion_resp_flr_07[4::12],
+                                                        pk_total_resp_flr_07[4::12] + neg_torsion_resp_flr_07[4::12],
+                                                        pk_total_resp_flr_07[5::12] + pos_torsion_resp_flr_07[5::12],
+                                                        pk_total_resp_flr_07[5::12] + neg_torsion_resp_flr_07[5::12]))), axis=0),
+
+
+                    'Floor 8': np.max(np.abs(np.vstack((
+                                                        pk_total_resp_flr_08[3::12] + pos_torsion_resp_flr_08[3::12],
+                                                        pk_total_resp_flr_08[3::12] + neg_torsion_resp_flr_08[3::12],
+                                                        pk_total_resp_flr_08[4::12] + pos_torsion_resp_flr_08[4::12],
+                                                        pk_total_resp_flr_08[4::12] + neg_torsion_resp_flr_08[4::12],
+                                                        pk_total_resp_flr_08[5::12] + pos_torsion_resp_flr_08[5::12],
+                                                        pk_total_resp_flr_08[5::12] + neg_torsion_resp_flr_08[5::12]))), axis=0),
+
+
+                    'Floor 9': np.max(np.abs(np.vstack((
+                                                        pk_total_resp_flr_09[3::12] + pos_torsion_resp_flr_09[3::12],
+                                                        pk_total_resp_flr_09[3::12] + neg_torsion_resp_flr_09[3::12],
+                                                        pk_total_resp_flr_09[4::12] + pos_torsion_resp_flr_09[4::12],
+                                                        pk_total_resp_flr_09[4::12] + neg_torsion_resp_flr_09[4::12],
+                                                        pk_total_resp_flr_09[5::12] + pos_torsion_resp_flr_09[5::12],
+                                                        pk_total_resp_flr_09[5::12] + neg_torsion_resp_flr_09[5::12]))), axis=0),
+
+
+                    'Floor 10': np.max(np.abs(np.vstack((
+                                                        pk_total_resp_flr_10[3::12] + pos_torsion_resp_flr_10[3::12],
+                                                        pk_total_resp_flr_10[3::12] + neg_torsion_resp_flr_10[3::12],
+                                                        pk_total_resp_flr_10[4::12] + pos_torsion_resp_flr_10[4::12],
+                                                        pk_total_resp_flr_10[4::12] + neg_torsion_resp_flr_10[4::12],
+                                                        pk_total_resp_flr_10[5::12] + pos_torsion_resp_flr_10[5::12],
+                                                        pk_total_resp_flr_10[5::12] + neg_torsion_resp_flr_10[5::12]))), axis=0),
+
+
+                    'Floor 11': np.max(np.abs(np.vstack((
+                                                        pk_total_resp_flr_11[3::12] + pos_torsion_resp_flr_11[3::12],
+                                                        pk_total_resp_flr_11[3::12] + neg_torsion_resp_flr_11[3::12],
+                                                        pk_total_resp_flr_11[4::12] + pos_torsion_resp_flr_11[4::12],
+                                                        pk_total_resp_flr_11[4::12] + neg_torsion_resp_flr_11[4::12],
+                                                        pk_total_resp_flr_11[5::12] + pos_torsion_resp_flr_11[5::12],
+                                                        pk_total_resp_flr_11[5::12] + neg_torsion_resp_flr_11[5::12]))), axis=0),
+                    }
+
 
         wall_axial_loads = pd.DataFrame(wall_axial_loads, index=['Wall_1', 'Wall_2', 'Wall_3', 'Wall_4', 'Wall_5',
                                                                  'Wall_6', 'Wall_7', 'Wall_8', 'Wall_9', 'Wall_10']).transpose()
+
+        wall_mom = pd.DataFrame(wall_mom, index=['Wall_1', 'Wall_2', 'Wall_3', 'Wall_4', 'Wall_5',
+                                                                 'Wall_6', 'Wall_7', 'Wall_8', 'Wall_9', 'Wall_10']).transpose()
+
 
     # Extract maximum shear force and bending moment for each floor
     Fx_flr_01, Fy_flr_01, Fz_flr_01, Mx_flr_01, My_flr_01, Mz_flr_01 = get_max_shear_and_moment(pk_total_resp_flr_01, pos_torsion_resp_flr_01, neg_torsion_resp_flr_01, pdelta_fac)
@@ -235,7 +340,7 @@ def process_beam_col_resp(elem_type, mrsa_resp_folder, pos_torsion_resp_folder, 
                                    Mz_flr_06, Mz_flr_07, Mz_flr_08, Mz_flr_09, Mz_flr_10,
                                    Mz_flr_11]
     if elem_type =='wall':
-        return(max_elem_demands, wall_axial_loads)
+        return(max_elem_demands, wall_axial_loads, wall_mom)
     else:
         return(max_elem_demands)
 
