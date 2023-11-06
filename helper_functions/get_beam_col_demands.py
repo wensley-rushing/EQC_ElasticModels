@@ -76,19 +76,21 @@ def get_max_shear_and_moment(total_mrsa_resp, pos_torsion_resp, neg_torsion_resp
     mom_z = combined_maximum_resp[5::6]
 
     # Extract maximum values and amplify to account for PDelta effects
-    max_force_x = force_x.max() * pdelta_fac
-    max_force_y = force_y.max() * pdelta_fac
-    max_force_z = force_z.max() * pdelta_fac
+    max_force_x = np.abs(force_x).max() * pdelta_fac
+    max_force_y = np.abs(force_y).max() * pdelta_fac
+    max_force_z = np.abs(force_z).max() * pdelta_fac
 
-    max_mom_x = mom_x.max() * pdelta_fac
-    max_mom_y = mom_y.max() * pdelta_fac
-    max_mom_z = mom_z.max() * pdelta_fac
+    max_mom_x = np.abs(mom_x).max() * pdelta_fac
+    max_mom_y = np.abs(mom_y).max() * pdelta_fac
+    max_mom_z = np.abs(mom_z).max() * pdelta_fac
 
 
     return max_force_x, max_force_y, max_force_z, max_mom_x, max_mom_y, max_mom_z
 
 
-def process_beam_col_resp(elem_type, mrsa_resp_folder, pos_torsion_resp_folder, neg_torsion_resp_folder, angular_freq, damp_ratio, num_modes, elf_mrsa_scale_factor, pdelta_fac):
+def process_beam_col_resp(elem_type, mrsa_resp_folder, pos_torsion_resp_folder,
+                          neg_torsion_resp_folder, angular_freq, damp_ratio,
+                          num_modes, elf_mrsa_scale_factor, pdelta_fac):
     """
     Computes the maximum beam shear force and bending moment for each floor.
 
@@ -177,19 +179,41 @@ def process_beam_col_resp(elem_type, mrsa_resp_folder, pos_torsion_resp_folder, 
 
     # Extract axial loads & Moments in each wall (i.e., Fz. from most critical combo of MRSA + Accidental torsional results)
     if elem_type == 'wall':
-        wall_axial_loads = {'Floor 1': np.maximum(pk_total_resp_flr_01[2::12] + pos_torsion_resp_flr_01[2::12], pk_total_resp_flr_01[2::12] + neg_torsion_resp_flr_01[2::12]),
-                            'Floor 2': np.maximum(pk_total_resp_flr_02[2::12] + pos_torsion_resp_flr_02[2::12], pk_total_resp_flr_02[2::12] + neg_torsion_resp_flr_02[2::12]),
-                            'Floor 3': np.maximum(pk_total_resp_flr_03[2::12] + pos_torsion_resp_flr_03[2::12], pk_total_resp_flr_03[2::12] + neg_torsion_resp_flr_03[2::12]),
-                            'Floor 4': np.maximum(pk_total_resp_flr_04[2::12] + pos_torsion_resp_flr_04[2::12], pk_total_resp_flr_04[2::12] + neg_torsion_resp_flr_04[2::12]),
-                            'Floor 5': np.maximum(pk_total_resp_flr_05[2::12] + pos_torsion_resp_flr_05[2::12], pk_total_resp_flr_05[2::12] + neg_torsion_resp_flr_05[2::12]),
-                            'Floor 6': np.maximum(pk_total_resp_flr_06[2::12] + pos_torsion_resp_flr_06[2::12], pk_total_resp_flr_06[2::12] + neg_torsion_resp_flr_06[2::12]),
-                            'Floor 7': np.maximum(pk_total_resp_flr_07[2::12] + pos_torsion_resp_flr_07[2::12], pk_total_resp_flr_07[2::12] + neg_torsion_resp_flr_07[2::12]),
-                            'Floor 8': np.maximum(pk_total_resp_flr_08[2::12] + pos_torsion_resp_flr_08[2::12], pk_total_resp_flr_08[2::12] + neg_torsion_resp_flr_08[2::12]),
-                            'Floor 9': np.maximum(pk_total_resp_flr_09[2::12] + pos_torsion_resp_flr_09[2::12], pk_total_resp_flr_09[2::12] + neg_torsion_resp_flr_09[2::12]),
-                            'Floor 10': np.maximum(pk_total_resp_flr_10[2::12] + pos_torsion_resp_flr_10[2::12], pk_total_resp_flr_10[2::12] + neg_torsion_resp_flr_10[2::12]),
-                            'Floor 11': np.maximum(pk_total_resp_flr_11[2::12] + pos_torsion_resp_flr_11[2::12], pk_total_resp_flr_11[2::12] + neg_torsion_resp_flr_11[2::12])}
+        wall_axial_loads = {'Floor 1': np.maximum(pk_total_resp_flr_01[2::12] + pos_torsion_resp_flr_01[2::12],
+                                                  pk_total_resp_flr_01[2::12] + neg_torsion_resp_flr_01[2::12]),
+
+                            'Floor 2': np.maximum(pk_total_resp_flr_02[2::12] + pos_torsion_resp_flr_02[2::12],
+                                                  pk_total_resp_flr_02[2::12] + neg_torsion_resp_flr_02[2::12]),
+
+                            'Floor 3': np.maximum(pk_total_resp_flr_03[2::12] + pos_torsion_resp_flr_03[2::12],
+                                                  pk_total_resp_flr_03[2::12] + neg_torsion_resp_flr_03[2::12]),
+
+                            'Floor 4': np.maximum(pk_total_resp_flr_04[2::12] + pos_torsion_resp_flr_04[2::12],
+                                                  pk_total_resp_flr_04[2::12] + neg_torsion_resp_flr_04[2::12]),
+
+                            'Floor 5': np.maximum(pk_total_resp_flr_05[2::12] + pos_torsion_resp_flr_05[2::12],
+                                                  pk_total_resp_flr_05[2::12] + neg_torsion_resp_flr_05[2::12]),
+
+                            'Floor 6': np.maximum(pk_total_resp_flr_06[2::12] + pos_torsion_resp_flr_06[2::12],
+                                                  pk_total_resp_flr_06[2::12] + neg_torsion_resp_flr_06[2::12]),
+
+                            'Floor 7': np.maximum(pk_total_resp_flr_07[2::12] + pos_torsion_resp_flr_07[2::12],
+                                                  pk_total_resp_flr_07[2::12] + neg_torsion_resp_flr_07[2::12]),
+
+                            'Floor 8': np.maximum(pk_total_resp_flr_08[2::12] + pos_torsion_resp_flr_08[2::12],
+                                                  pk_total_resp_flr_08[2::12] + neg_torsion_resp_flr_08[2::12]),
+
+                            'Floor 9': np.maximum(pk_total_resp_flr_09[2::12] + pos_torsion_resp_flr_09[2::12],
+                                                  pk_total_resp_flr_09[2::12] + neg_torsion_resp_flr_09[2::12]),
+
+                            'Floor 10': np.maximum(pk_total_resp_flr_10[2::12] + pos_torsion_resp_flr_10[2::12],
+                                                   pk_total_resp_flr_10[2::12] + neg_torsion_resp_flr_10[2::12]),
+
+                            'Floor 11': np.maximum(pk_total_resp_flr_11[2::12] + pos_torsion_resp_flr_11[2::12],
+                                                   pk_total_resp_flr_11[2::12] + neg_torsion_resp_flr_11[2::12])}
 
         # For moments, the moment at the base of each wall element (i.e. the i-node) would govern
+        # Stack moment timeseries about x, y, & z then extract maximum.
         wall_mom = {
                     'Floor 1': np.max(np.abs(np.vstack((
                                                         pk_total_resp_flr_01[3::12] + pos_torsion_resp_flr_01[3::12],
@@ -295,8 +319,12 @@ def process_beam_col_resp(elem_type, mrsa_resp_folder, pos_torsion_resp_folder, 
                                                                  'Wall_6', 'Wall_7', 'Wall_8', 'Wall_9', 'Wall_10']).transpose()
 
         wall_mom = pd.DataFrame(wall_mom, index=['Wall_1', 'Wall_2', 'Wall_3', 'Wall_4', 'Wall_5',
-                                                                 'Wall_6', 'Wall_7', 'Wall_8', 'Wall_9', 'Wall_10']).transpose()
+                                                 'Wall_6', 'Wall_7', 'Wall_8', 'Wall_9', 'Wall_10']).transpose()
 
+        # wall_mom = pd.DataFrame(wall_mom, index=['Wall_1Bot', 'Wall_1Top', 'Wall_2Bot', 'Wall_2Top', 'Wall_3Bot', 'Wall_3Top',
+        #                                          'Wall_4Bot', 'Wall_4Top', 'Wall_5Bot', 'Wall_5Top', 'Wall_6Bot', 'Wall_6Top',
+        #                                          'Wall_7Bot', 'Wall_7Top', 'Wall_8Bot', 'Wall_8Top', 'Wall_9Bot', 'Wall_9Top',
+        #                                          'Wall_10Bot', 'Wall_10Top']).transpose()
 
     # Extract maximum shear force and bending moment for each floor
     Fx_flr_01, Fy_flr_01, Fz_flr_01, Mx_flr_01, My_flr_01, Mz_flr_01 = get_max_shear_and_moment(pk_total_resp_flr_01, pos_torsion_resp_flr_01, neg_torsion_resp_flr_01, pdelta_fac)
