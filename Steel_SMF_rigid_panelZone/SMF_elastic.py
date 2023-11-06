@@ -7,8 +7,6 @@ Created on Thu May 25 17:43:33 2023
 # Import required modules
 import os
 import sys
-import math
-import time
 import openseespy.opensees as ops
 import pandas as pd
 import numpy as np
@@ -522,14 +520,14 @@ def build_model():
     ops.region(310, '-eleOnly', *col_tags[9])  # Region for all columns on 10th floor
     ops.region(311, '-eleOnly', *col_tags[10]) # Region for all columns on 11th floor
 
-# Create pvd recorder
-record_direc = './pvd/'
-os.makedirs(record_direc, exist_ok=True)
-ops.recorder('PVD', record_direc, '-precision', 3, '-dT', 1, *['mass', 'reaction'], 'eigen', 10)
 
 # Generate model
 build_model()
 
+# Create pvd recorder
+record_direc = './pvd/'
+os.makedirs(record_direc, exist_ok=True)
+ops.recorder('PVD', record_direc, '-precision', 3, '-dT', 1, *['mass', 'reaction'], 'eigen', 10)
 
 # ============================================================================
 # Eigen Analysis

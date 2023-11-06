@@ -22,6 +22,7 @@ from helper_functions.create_floor_shell import refine_mesh
 from helper_functions.create_floor_shell import create_shell
 from helper_functions.cqc_modal_combo import modal_combo
 from helper_functions.get_beam_col_demands import process_beam_col_resp
+from helper_functions.get_story_drift import compute_story_drifts
 from helper_functions.elf_new_zealand import nz_horiz_seismic_shear, nz_horiz_force_distribution
 from helper_functions.get_spectral_shape_factor import spectral_shape_fac
 from helper_functions.get_wall_reinforcement import get_wall_reinf_ratio
@@ -95,7 +96,6 @@ elev = [flr1, flr2, flr3, flr4, flr5, flr6, flr7, flr8, flr9, flr10, roof_flr]
 
 # Generic material properties
 conc_rho = 24 * kN / m**3 # Density of concrete
-conc_mass_rho = conc_rho / grav_metric
 conc_fcp = 40 * MPa  # Compressive strength of concrete
 steelE = 200 * GPa  # Modulus of steel
 
@@ -213,7 +213,7 @@ col_wall_y_coords = np.array(list(col_wall_y_coords))
 # Create finer mesh
 discretize = 0
 if discretize:
-    mesh_size = 1.5 * m  # Mesh size
+    mesh_size = 1 * m  # Mesh size
     x_coords = refine_mesh(col_wall_x_coords, mesh_size)
     y_coords = refine_mesh(col_wall_y_coords, mesh_size)
 else:
@@ -257,8 +257,7 @@ nD_mattag = 1
 plate_fiber_tag = 2
 shell_sect_tag = 1
 
-slab_stiff_modif = 0.5
-slab_thick = slab_stiff_modif * 165 * mm
+slab_thick =  165 * mm
 fiber_thick = slab_thick / 3
 
 shell_E =  26000 * MPa # Modulus of concrete
@@ -282,7 +281,7 @@ def create_floor(elev, floor_num, floor_label=''):
     node_compile = []  # Store node tags grouped according to their y-coordinates
 
     # Create nodes
-    node_num = int(floor_num + '1000000')
+    node_num = int(floor_num + '1000')
 
     # Create timeseries for assigning self weight of walls
     ts_tag = int(floor_num)
@@ -449,12 +448,12 @@ def get_wall_prop(section_prop, orient):
 
     # Compute moment of inertias (using reduced sectional properties) based on wall orientation
     if orient == 'EW': # Wall orientation West-East
-        wall_Iy = 0.5 * wall_length * (wall_thick**3) / 12 * 0.00001
+        wall_Iy = 0.5 * wall_length * (wall_thick**3) / 12
         wall_Iz = 0.5 *(wall_length**3) * wall_thick / 12
 
     else:  # Wall orientation is North-South
         wall_Iy = 0.5 * (wall_length**3) * wall_thick / 12
-        wall_Iz = 0.5 * wall_length * (wall_thick**3) / 12 * 0.00001
+        wall_Iz = 0.5 * wall_length * (wall_thick**3) / 12
 
     return wall_area, wall_Iy, wall_Iz
 
@@ -467,7 +466,7 @@ def create_walls(floor_num):
         wall_A, wall_Iy, wall_Iz = get_wall_prop(wall_prop[ii], wall_orient[ii])
 
         # element('ElasticTimoshenkoBeam', eleTag, *eleNodes, E_mod, G_mod, Area, Jxx, Iy, Iz, Avy, Avz, transfTag, <'-mass', massDens>, <'-cMass'>)
-        ops.element('ElasticTimoshenkoBeam', wall_tag, lfre_node_tags.iloc[ii][floor_num] - 10000000,
+        ops.element('ElasticTimoshenkoBeam', wall_tag, lfre_node_tags.iloc[ii][floor_num] - 10000,
                     lfre_node_tags.iloc[ii][floor_num], wall_E, wall_G, wall_A, 0.0, wall_Iy, wall_Iz, wall_A, wall_A, wall_transf_tag)
 
         # Update reference to wall_tag
@@ -485,7 +484,7 @@ bm_G = bm_E / (2*(1 + bm_nu))
 bm_I = 762 * 1E6 * mm**4   # strong axis
 bm_J = 778 * 1E3 * mm**4
 
-wall_link_A = bm_A
+wall_link_A = bm_A * 100
 wall_link_E = bm_E * 100
 wall_link_G = bm_G
 wall_link_J = bm_J
@@ -598,10 +597,9 @@ col_E = steelE
 # The geometric properties of the columns oriented in the East-West direction will be defined using a W14x132 (metric W360x196)
 col_A_EW = 25000 * mm**2
 col_G_EW = col_E / (2*(1 + col_nu))
-col_stiff_modif = 1
-col_Iy_EW = col_stiff_modif * 228 * 1E6 * mm**4   # weak Iyy
-col_Iz_EW = col_stiff_modif * 637 * 1E6 * mm**4   # strong Ixx
-col_J_EW = col_stiff_modif * 5120 * 1E3 * mm**4
+col_Iy_EW = 228 * 1E6 * mm**4   # weak Iyy
+col_Iz_EW = 637 * 1E6 * mm**4   # strong Ixx
+col_J_EW = 5120 * 1E3 * mm**4
 
 col_transf_tag = 4
 
@@ -609,49 +607,49 @@ col_transf_tag = 4
 # The geometric properties of the columns oriented in the North-South direction will be defined using a W14x132 (metric W360x196)
 col_A_NS = 25000 * mm**2
 col_G_NS = col_E / (2*(1 + col_nu))
-col_Iy_NS = col_stiff_modif * 637 * 1E6 * mm**4   # strong Ixx
-col_Iz_NS = col_stiff_modif * 228 * 1E6 * mm**4   # weak Iyy
-col_J_NS = col_stiff_modif * 5120 * 1E3 * mm**4
+col_Iy_NS = 637 * 1E6 * mm**4   # strong Ixx
+col_Iz_NS = 228 * 1E6 * mm**4   # weak Iyy
+col_J_NS = 5120 * 1E3 * mm**4
 
 
 def create_columns(floor_num):
 
     col_tag = int('3' + floor_num + '01')  # 30101
 
-    ops.element('elasticBeamColumn', col_tag, lfre_node_tags.loc['col1'][floor_num] - 10000000, lfre_node_tags.loc['col1'][floor_num],
+    ops.element('elasticBeamColumn', col_tag, lfre_node_tags.loc['col1'][floor_num] - 10000, lfre_node_tags.loc['col1'][floor_num],
                 col_A_NS, col_E, col_G_NS, col_J_NS, col_Iy_NS, col_Iz_NS, col_transf_tag)  # Col 1
 
-    ops.element('elasticBeamColumn', col_tag + 1, lfre_node_tags.loc['col2'][floor_num] - 10000000, lfre_node_tags.loc['col2'][floor_num],
+    ops.element('elasticBeamColumn', col_tag + 1, lfre_node_tags.loc['col2'][floor_num] - 10000, lfre_node_tags.loc['col2'][floor_num],
                 col_A_NS, col_E, col_G_NS, col_J_NS, col_Iy_NS, col_Iz_NS, col_transf_tag)  # Col 2
 
-    ops.element('elasticBeamColumn', col_tag + 2, lfre_node_tags.loc['col3'][floor_num] - 10000000, lfre_node_tags.loc['col3'][floor_num],
+    ops.element('elasticBeamColumn', col_tag + 2, lfre_node_tags.loc['col3'][floor_num] - 10000, lfre_node_tags.loc['col3'][floor_num],
                 col_A_NS, col_E, col_G_NS, col_J_NS, col_Iy_NS, col_Iz_NS, col_transf_tag)  # Col 3
 
-    ops.element('elasticBeamColumn', col_tag + 3, lfre_node_tags.loc['col4'][floor_num] - 10000000, lfre_node_tags.loc['col4'][floor_num],
+    ops.element('elasticBeamColumn', col_tag + 3, lfre_node_tags.loc['col4'][floor_num] - 10000, lfre_node_tags.loc['col4'][floor_num],
                 col_A_NS, col_E, col_G_NS, col_J_NS, col_Iy_NS, col_Iz_NS, col_transf_tag)  # Col 4
 
-    ops.element('elasticBeamColumn', col_tag + 4, lfre_node_tags.loc['col5'][floor_num] - 10000000, lfre_node_tags.loc['col5'][floor_num],
+    ops.element('elasticBeamColumn', col_tag + 4, lfre_node_tags.loc['col5'][floor_num] - 10000, lfre_node_tags.loc['col5'][floor_num],
                 col_A_EW, col_E, col_G_EW, col_J_EW, col_Iy_EW, col_Iz_EW, col_transf_tag)  # Col 5
 
-    ops.element('elasticBeamColumn', col_tag + 5, lfre_node_tags.loc['col6'][floor_num] - 10000000, lfre_node_tags.loc['col6'][floor_num],
+    ops.element('elasticBeamColumn', col_tag + 5, lfre_node_tags.loc['col6'][floor_num] - 10000, lfre_node_tags.loc['col6'][floor_num],
                 col_A_EW, col_E, col_G_EW, col_J_EW, col_Iy_EW, col_Iz_EW, col_transf_tag)  # Col 6
 
-    ops.element('elasticBeamColumn', col_tag + 6, lfre_node_tags.loc['col7'][floor_num] - 10000000, lfre_node_tags.loc['col7'][floor_num],
+    ops.element('elasticBeamColumn', col_tag + 6, lfre_node_tags.loc['col7'][floor_num] - 10000, lfre_node_tags.loc['col7'][floor_num],
                 col_A_NS, col_E, col_G_NS, col_J_NS, col_Iy_NS, col_Iz_NS, col_transf_tag)  # Col 7
 
-    ops.element('elasticBeamColumn', col_tag + 7, lfre_node_tags.loc['col8'][floor_num] - 10000000, lfre_node_tags.loc['col8'][floor_num],
+    ops.element('elasticBeamColumn', col_tag + 7, lfre_node_tags.loc['col8'][floor_num] - 10000, lfre_node_tags.loc['col8'][floor_num],
                 col_A_EW, col_E, col_G_EW, col_J_EW, col_Iy_EW, col_Iz_EW, col_transf_tag)  # Col 8
 
-    ops.element('elasticBeamColumn', col_tag + 8, lfre_node_tags.loc['col9'][floor_num] - 10000000, lfre_node_tags.loc['col9'][floor_num],
+    ops.element('elasticBeamColumn', col_tag + 8, lfre_node_tags.loc['col9'][floor_num] - 10000, lfre_node_tags.loc['col9'][floor_num],
                 col_A_EW, col_E, col_G_EW, col_J_EW, col_Iy_EW, col_Iz_EW, col_transf_tag)  # Col 9
 
-    ops.element('elasticBeamColumn', col_tag + 9, lfre_node_tags.loc['col10'][floor_num] - 10000000, lfre_node_tags.loc['col10'][floor_num],
+    ops.element('elasticBeamColumn', col_tag + 9, lfre_node_tags.loc['col10'][floor_num] - 10000, lfre_node_tags.loc['col10'][floor_num],
                 col_A_EW, col_E, col_G_EW, col_J_EW, col_Iy_EW, col_Iz_EW, col_transf_tag)  # Col 10
 
-    ops.element('elasticBeamColumn', col_tag + 10, lfre_node_tags.loc['col11'][floor_num] - 10000000, lfre_node_tags.loc['col11'][floor_num],
+    ops.element('elasticBeamColumn', col_tag + 10, lfre_node_tags.loc['col11'][floor_num] - 10000, lfre_node_tags.loc['col11'][floor_num],
                 col_A_EW, col_E, col_G_EW, col_J_EW, col_Iy_EW, col_Iz_EW, col_transf_tag)  # Col 11
 
-    ops.element('elasticBeamColumn', col_tag + 11, lfre_node_tags.loc['col12'][floor_num] - 10000000, lfre_node_tags.loc['col12'][floor_num],
+    ops.element('elasticBeamColumn', col_tag + 11, lfre_node_tags.loc['col12'][floor_num] - 10000, lfre_node_tags.loc['col12'][floor_num],
                 col_A_EW, col_E, col_G_EW, col_J_EW, col_Iy_EW, col_Iz_EW, col_transf_tag)  # Col 12
 
 
@@ -666,12 +664,9 @@ def build_model():
     ops.model('basic', '-ndm', 3, '-ndf', 6)
 
     # Create shell material for floor diaphragm
-    # ops.nDMaterial('ElasticIsotropic', nD_mattag, shell_E, shell_nu)
-    # ops.nDMaterial('PlateFiber', plate_fiber_tag, nD_mattag)
-    # ops.section('LayeredShell', shell_sect_tag, 3, plate_fiber_tag, fiber_thick, plate_fiber_tag, fiber_thick, plate_fiber_tag, fiber_thick)
-
-    # https://openseespydoc.readthedocs.io/en/latest/src/elasticMembranePlateSection.html
-    ops.section('ElasticMembranePlateSection', shell_sect_tag, shell_E, shell_nu, slab_thick, 0.0, 0.1)
+    ops.nDMaterial('ElasticIsotropic', nD_mattag, shell_E, shell_nu)
+    ops.nDMaterial('PlateFiber', plate_fiber_tag, nD_mattag)
+    ops.section('LayeredShell', shell_sect_tag, 3, plate_fiber_tag, fiber_thick, plate_fiber_tag, fiber_thick, plate_fiber_tag, fiber_thick)
 
     # Define geometric transformation for walls
     ops.geomTransf('Linear', wall_transf_tag, 0, 1, 0)
@@ -778,7 +773,21 @@ if eigen:
 
     print('')
     for ii in range(1, num_modes+1):
-        print('Mode {} Tn: {:.3f} sec'.format(ii, periods[ii-1]))
+        print('Mode {} Tn: {:.2f} sec'.format(ii, periods[ii-1]))
+
+    # Extract translational eigen vector values at COM of each floor
+    com_eigen_vec_x = np.zeros(len(com_node_tags))
+    com_eigen_vec_y = np.zeros(len(com_node_tags))
+
+    ii = 0
+    for key in com_node_tags.keys():
+        com_eigen_vec_x[ii] = ops.nodeEigenvector(com_node_tags[key], 1, 1)
+        com_eigen_vec_y[ii] = ops.nodeEigenvector(com_node_tags[key], 1, 2)
+        ii += 1
+
+    # Normalize eigen vector by the magnitude at the roof
+    com_eigen_vec_x /=  com_eigen_vec_x[-1]
+    com_eigen_vec_y /=  com_eigen_vec_y[-1]
 
     modal_prop = ops.modalProperties('-file', 'ModalReport_RCSW.txt', '-unorm', '-return')
 
@@ -893,21 +902,21 @@ if mrsa:
 
         # Create recorders to store nodal displacements at the building edges
         ops.recorder('Node', '-file', mrsa_res_folder + 'lowerLeftCornerDisp.txt',
-                      '-node', *list(wall_ends_node_tags.loc['wall1_l'])[1:], '-dof', direcs[ii], 'disp')
+                     '-node', *list(wall_ends_node_tags.loc['wall1_l'])[1:], '-dof', direcs[ii], 'disp')
 
         ops.recorder('Node', '-file', mrsa_res_folder + 'upperRightCornerDisp.txt',
-                      '-node', *list(wall_ends_node_tags.loc['wall10_r'])[1:], '-dof', direcs[ii], 'disp')
+                     '-node', *list(wall_ends_node_tags.loc['wall10_r'])[1:], '-dof', direcs[ii], 'disp')
 
         ops.recorder('Node', '-file', mrsa_res_folder + 'lowerRightCornerDisp.txt',
-                      '-node', *list(lfre_node_tags.loc['col3'])[1:], '-dof', direcs[ii], 'disp')
+                     '-node', *list(lfre_node_tags.loc['col3'])[1:], '-dof', direcs[ii], 'disp')
 
         # Base shear
         ops.recorder('Node', '-file', mrsa_res_folder + 'baseShear' + axis[ii] + '.txt',
-                      '-node', *lfre_node_tags['00'].tolist(), '-dof', direcs[ii], 'reaction')
+                     '-node', *lfre_node_tags['00'].tolist(), '-dof', direcs[ii], 'reaction')
 
         # Recorders for COM displacement
         ops.recorder('Node', '-file', mrsa_res_folder + 'COM_disp' + axis[ii] + '.txt',
-                      '-node', *list(com_node_tags.values()), '-dof', direcs[ii], 'disp')
+                     '-node', *list(com_node_tags.values()), '-dof', direcs[ii], 'disp')
 
         for jj in range(num_modes):
             ops.responseSpectrumAnalysis(direcs[ii], '-Tn', *spect_periods, '-Sa', *spect_acc, '-mode', jj + 1)
@@ -922,28 +931,7 @@ ops.wipe()
 print('\nMRSA completed.')
 print('======================================================')
 
-# ============================================================================
-# Post-process MRSA results
-# ============================================================================
-mrsa_base_shearX = modal_combo(np.loadtxt('./mrsa_results/dirX/baseShearX.txt'), lambda_list, damping_ratio, num_modes).sum()
-mrsa_base_shearY = modal_combo(np.loadtxt('./mrsa_results/dirY/baseShearY.txt'), lambda_list, damping_ratio, num_modes).sum()
 
-mrsa_flr_1_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor01_wallResp.txt'), lambda_list, damping_ratio, num_modes)
-mrsa_flr_2_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor02_wallResp.txt'), lambda_list, damping_ratio, num_modes)
-mrsa_flr_3_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor03_wallResp.txt'), lambda_list, damping_ratio, num_modes)
-mrsa_flr_4_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor04_wallResp.txt'), lambda_list, damping_ratio, num_modes)
-mrsa_flr_5_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor05_wallResp.txt'), lambda_list, damping_ratio, num_modes)
-mrsa_flr_6_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor06_wallResp.txt'), lambda_list, damping_ratio, num_modes)
-mrsa_flr_7_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor07_wallResp.txt'), lambda_list, damping_ratio, num_modes)
-mrsa_flr_8_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor08_wallResp.txt'), lambda_list, damping_ratio, num_modes)
-mrsa_flr_9_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor09_wallResp.txt'), lambda_list, damping_ratio, num_modes)
-mrsa_flr_10_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor10_wallResp.txt'), lambda_list, damping_ratio, num_modes)
-mrsa_flr_11_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor11_wallResp.txt'), lambda_list, damping_ratio, num_modes)
-
-flr_1_Fz = mrsa_flr_1_demands[2::12]
-flr_1_Mx = mrsa_flr_1_demands[3::12]
-
-# """
 # ============================================================================
 # Compute Torsional Irregularity Ratio (TIR)
 # ============================================================================
@@ -964,6 +952,12 @@ lower_right_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/lowerRigh
 
 tir_y_edgeE = np.maximum(upper_right_corner_dispY, lower_right_corner_dispY) / (0.5*(upper_right_corner_dispY + lower_right_corner_dispY))  # Right edge of building plan
 tir_y_edgeF = np.maximum(lower_left_corner_dispY, lower_right_corner_dispY) / (0.5*(lower_left_corner_dispY + lower_right_corner_dispY))    # Bottom edge of building plan
+
+# ============================================================================
+# Post-process MRSA results
+# ============================================================================
+mrsa_base_shearX = modal_combo(np.loadtxt('./mrsa_results/dirX/baseShearX.txt'), lambda_list, damping_ratio, num_modes).sum()
+mrsa_base_shearY = modal_combo(np.loadtxt('./mrsa_results/dirY/baseShearY.txt'), lambda_list, damping_ratio, num_modes).sum()
 
 # ============================================================================
 # Perform ELF
@@ -1028,33 +1022,58 @@ mrsa_com_dispY = np.loadtxt('./mrsa_results/dirY/COM_dispY.txt')  # For MRSA in 
 # Drift amplification factor
 drift_modif_fac = 1.5  # NZS 1170.5-2004: Table 7.1
 
-# P-Delta Method B: (NZS 1170.5:2004 - Sect. 6.5.4.2 & Commentary Sect. C6.5.4.2)
-# Modal combination on peak COM displacements from MRSA
-mrsa_total_com_dispX = modal_combo(mrsa_com_dispX, lambda_list, damping_ratio, num_modes)
-mrsa_total_com_dispY = modal_combo(mrsa_com_dispY, lambda_list, damping_ratio, num_modes)
+pdelta_method = "B"
 
-# Scale COM displacements by elf-to-mrsa base shear factor # NZS 1170.5-2004: Sect 5.2.2.2b
-mrsa_total_com_dispX *= elf_mrsaX_scale_factor
-mrsa_total_com_dispY *= elf_mrsaY_scale_factor
+if pdelta_method == "A":  # (NZS 1170.5:2004 - Sect. 6.5.4.1)
 
-# Amplify COM displacements by ductility factor
-# NZS 1170.5:2004 Commentary Sect. C6.5.4.2 Step 2
-mrsa_total_com_dispX *= ductility_factor
-mrsa_total_com_dispY *= ductility_factor
+    # Compute story drifts
+    story_driftX = compute_story_drifts(mrsa_com_dispX, story_heights, lambda_list, damping_ratio, num_modes)
+    story_driftY = compute_story_drifts(mrsa_com_dispY, story_heights, lambda_list, damping_ratio, num_modes)
 
-# Compute interstory displacements
-inter_story_dispX = np.insert(np.diff(mrsa_total_com_dispX), 0, mrsa_total_com_dispX[0])
-inter_story_dispY = np.insert(np.diff(mrsa_total_com_dispY), 0, mrsa_total_com_dispY[0])
+    # Scale drifts by elf-to-mrsa base shear factor # NZS 1170.5-2004: Sect 5.2.2.2b
+    story_driftX *= elf_mrsaX_scale_factor
+    story_driftY *= elf_mrsaY_scale_factor
 
-# Compute story shear force due to PDelta actions
-# NZS 1170.5:2004 Commentary Sect. C6.5.4.2 Step 3a
-story_shear_forceX  = story_weights * inter_story_dispX / story_heights
-story_shear_forceY  = story_weights * inter_story_dispY / story_heights
+    kp  = 0.015 + 0.0075*(ductility_factor - 1)
+    kp = min(max(0.0015, kp), 0.03)
+    pdelta_fac = (kp * seismic_weight + elf_base_shear) / elf_base_shear  # NZS 1170.5-2004: Sec 7.2.1.2 & 6.5.4.1
+    # pdelta_fac = 1
 
-# Compute lateral forces to be used in static analysis for PDelta effects
-# NZS 1170.5:2004 Commentary Sect. C6.5.4.2 Step 3b
-lateral_forces_pDeltaX = np.insert(np.diff(story_shear_forceX), 0, story_shear_forceX[0])
-lateral_forces_pDeltaY = np.insert(np.diff(story_shear_forceY), 0, story_shear_forceY[0])
+    # Amplify drifts by required factors
+    story_driftX *=  (ductility_factor * pdelta_fac * drift_modif_fac)
+    story_driftY *=  (ductility_factor * pdelta_fac * drift_modif_fac)
+
+    check_drift_and_stability(story_driftX, story_driftY)
+
+else: # Method B (NZS 1170.5:2004 - Sect. 6.5.4.2 & Commentary Sect. C6.5.4.2)
+
+    # Modal combination on peak COM displacements from MRSA
+    mrsa_total_com_dispX = modal_combo(mrsa_com_dispX, lambda_list, damping_ratio, num_modes)
+    mrsa_total_com_dispY = modal_combo(mrsa_com_dispY, lambda_list, damping_ratio, num_modes)
+
+    # Scale COM displacements by elf-to-mrsa base shear factor # NZS 1170.5-2004: Sect 5.2.2.2b
+    mrsa_total_com_dispX *= elf_mrsaX_scale_factor
+    mrsa_total_com_dispY *= elf_mrsaY_scale_factor
+
+    # Amplify COM displacements by ductility factor
+    # NZS 1170.5:2004 Commentary Sect. C6.5.4.2 Step 2
+    mrsa_total_com_dispX *= ductility_factor
+    mrsa_total_com_dispY *= ductility_factor
+
+    # Compute interstory displacements
+    inter_story_dispX = np.insert(np.diff(mrsa_total_com_dispX), 0, mrsa_total_com_dispX[0])
+    inter_story_dispY = np.insert(np.diff(mrsa_total_com_dispY), 0, mrsa_total_com_dispY[0])
+
+    # Compute story shear force due to PDelta actions
+    # NZS 1170.5:2004 Commentary Sect. C6.5.4.2 Step 3a
+    story_shear_forceX  = story_weights * inter_story_dispX / story_heights
+    story_shear_forceY  = story_weights * inter_story_dispY / story_heights
+
+    # Compute lateral forces to be used in static analysis for PDelta effects
+    # NZS 1170.5:2004 Commentary Sect. C6.5.4.2 Step 3b
+    lateral_forces_pDeltaX = np.insert(np.diff(story_shear_forceX), 0, story_shear_forceX[0])
+    lateral_forces_pDeltaY = np.insert(np.diff(story_shear_forceY), 0, story_shear_forceY[0])
+
 
 # ===================================================================================================
 # Perform static analysis for accidental torsional moment & PDelta effects - method B (if applicable)
@@ -1082,9 +1101,7 @@ for ii in range(len(torsional_direc)):
 
     # For each direction, account for positive & negative loading
     for jj in range(len(torsional_sign)):
-        print('\nNow commencing static analysis using torsional moments for '
-              + torsional_folder[jj] + ' ' + torsional_direc[ii] + ' direction.')
-
+        print('\nNow commencing static analysis using torsional moments for ' + torsional_folder[jj] + ' ' + torsional_direc[ii] + ' direction.')
         build_model()
 
         print('\nModel generated...')
@@ -1101,70 +1118,50 @@ for ii in range(len(torsional_direc)):
 
         # Loop through each COM node and apply torsional moment & PDelta lateral force if applicable
         for kk in range(len(com_nodes)):
+            if torsional_direc[ii] == 'X' and pdelta_method == "A":  # Only torsional moment is applied about z-axis
+                ops.load(com_nodes[kk], 0., 0., 0., 0., 0., torsional_mom_x[kk] * torsional_sign[jj])
 
-            if torsional_direc[ii] == 'X': # Torsional moment about z-axis & PDelta "Method B" forces are applied
+            elif torsional_direc[ii] == 'X' and pdelta_method == "B": # Torsional moment about z-axis & PDelta "Method B" forces are applied
                 ops.load(com_nodes[kk], lateral_forces_pDeltaX[kk], 0., 0., 0., 0., torsional_mom_x[kk] * torsional_sign[jj])
-                print(lateral_forces_pDeltaX[kk], torsional_mom_x[kk])
 
-            elif torsional_direc[ii] == 'Y':  # Torsional moment about z-axis & PDelta "Method B" forces are applied
+            elif torsional_direc[ii] == 'Y' and pdelta_method == "A":  # Only torsional moment is applied about z-axis
+                ops.load(com_nodes[kk], 0., 0., 0., 0., 0., torsional_mom_y[kk] * torsional_sign[jj])
+
+            elif torsional_direc[ii] == 'Y' and pdelta_method == "B":  # Torsional moment about z-axis & PDelta "Method B" forces are applied
                 ops.load(com_nodes[kk], 0., lateral_forces_pDeltaY[kk], 0., 0., 0., torsional_mom_y[kk] * torsional_sign[jj])
-                print(lateral_forces_pDeltaX[kk], torsional_mom_x[kk])
 
         # Create directory to save results
         accident_torsion_res_folder = './accidental_torsion_results/' + torsional_folder[jj] + torsional_direc[ii] + '/'
         os.makedirs(accident_torsion_res_folder, exist_ok=True)
 
         # Create recorders for column response in direction of excitation
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor01_colResp.txt',
-                      '-precision', 9, '-region', 301, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor02_colResp.txt',
-                      '-precision', 9, '-region', 302, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor03_colResp.txt',
-                      '-precision', 9, '-region', 303, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor04_colResp.txt',
-                      '-precision', 9, '-region', 304, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor05_colResp.txt',
-                      '-precision', 9, '-region', 305, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor06_colResp.txt',
-                      '-precision', 9, '-region', 306, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor07_colResp.txt',
-                      '-precision', 9, '-region', 307, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor08_colResp.txt',
-                      '-precision', 9, '-region', 308, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor09_colResp.txt',
-                      '-precision', 9, '-region', 309, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor10_colResp.txt',
-                      '-precision', 9, '-region', 310, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor11_colResp.txt',
-                      '-precision', 9, '-region', 311, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor01_colResp.txt', '-precision', 9, '-region', 301, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor02_colResp.txt', '-precision', 9, '-region', 302, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor03_colResp.txt', '-precision', 9, '-region', 303, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor04_colResp.txt', '-precision', 9, '-region', 304, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor05_colResp.txt', '-precision', 9, '-region', 305, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor06_colResp.txt', '-precision', 9, '-region', 306, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor07_colResp.txt', '-precision', 9, '-region', 307, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor08_colResp.txt', '-precision', 9, '-region', 308, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor09_colResp.txt', '-precision', 9, '-region', 309, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor10_colResp.txt', '-precision', 9, '-region', 310, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor11_colResp.txt', '-precision', 9, '-region', 311, 'force')
 
         # Create recorders for wall response in direction of excitation
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor01_wallResp.txt',
-                      '-precision', 9, '-region', 401, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor02_wallResp.txt',
-                      '-precision', 9, '-region', 402, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor03_wallResp.txt',
-                      '-precision', 9, '-region', 403, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor04_wallResp.txt',
-                      '-precision', 9, '-region', 404, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor05_wallResp.txt',
-                      '-precision', 9, '-region', 405, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor06_wallResp.txt',
-                      '-precision', 9, '-region', 406, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor07_wallResp.txt',
-                      '-precision', 9, '-region', 407, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor08_wallResp.txt',
-                      '-precision', 9, '-region', 408, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor09_wallResp.txt',
-                      '-precision', 9, '-region', 409, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor10_wallResp.txt',
-                      '-precision', 9, '-region', 410, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor11_wallResp.txt',
-                      '-precision', 9, '-region', 411, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor01_wallResp.txt', '-precision', 9, '-region', 401, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor02_wallResp.txt', '-precision', 9, '-region', 402, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor03_wallResp.txt', '-precision', 9, '-region', 403, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor04_wallResp.txt', '-precision', 9, '-region', 404, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor05_wallResp.txt', '-precision', 9, '-region', 405, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor06_wallResp.txt', '-precision', 9, '-region', 406, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor07_wallResp.txt', '-precision', 9, '-region', 407, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor08_wallResp.txt', '-precision', 9, '-region', 408, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor09_wallResp.txt', '-precision', 9, '-region', 409, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor10_wallResp.txt', '-precision', 9, '-region', 410, 'force')
+        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor11_wallResp.txt', '-precision', 9, '-region', 411, 'force')
 
         # Recorders for COM displacement
-        ops.recorder('Node', '-file', accident_torsion_res_folder + 'COM_disp' + torsional_direc[ii] + '.txt',
-                      '-node', *list(com_node_tags.values()), '-dof', elf_dof[ii], 'disp')
+        ops.recorder('Node', '-file', accident_torsion_res_folder + 'COM_disp' + torsional_direc[ii] + '.txt', '-node', *list(com_node_tags.values()), '-dof', elf_dof[ii], 'disp')
 
         # Base shear
         ops.recorder('Node', '-file', accident_torsion_res_folder + 'baseShear' + torsional_direc[ii] + '.txt', '-node',
@@ -1193,63 +1190,64 @@ for ii in range(len(torsional_direc)):
 
 print('\nStatic analysis for accidental torsion completed...')
 
-# Process drifts due to PDelta lateral forces
-pdelta_com_disp_posX = np.loadtxt('./accidental_torsion_results/positiveX/COM_dispX.txt')
-pdelta_com_disp_negX = np.loadtxt('./accidental_torsion_results/negativeX/COM_dispX.txt')
-pdelta_com_disp_posY = np.loadtxt('./accidental_torsion_results/positiveY/COM_dispY.txt')
-pdelta_com_disp_negY = np.loadtxt('./accidental_torsion_results/negativeY/COM_dispY.txt')
+if pdelta_method == "B":
+    # Process drifts due to PDelta lateral forces
+    pdelta_com_disp_posX = np.loadtxt('./accidental_torsion_results/positiveX/COM_dispX.txt')
+    pdelta_com_disp_negX = np.loadtxt('./accidental_torsion_results/negativeX/COM_dispX.txt')
+    pdelta_com_disp_posY = np.loadtxt('./accidental_torsion_results/positiveY/COM_dispY.txt')
+    pdelta_com_disp_negY = np.loadtxt('./accidental_torsion_results/negativeY/COM_dispY.txt')
 
-pdelta_com_dispX = np.maximum(pdelta_com_disp_posX, pdelta_com_disp_negX)
-pdelta_com_dispY = np.maximum(pdelta_com_disp_posY, pdelta_com_disp_negY)
+    pdelta_com_dispX = np.maximum(pdelta_com_disp_posX, pdelta_com_disp_negX)
+    pdelta_com_dispY = np.maximum(pdelta_com_disp_posY, pdelta_com_disp_negY)
 
-# Determine subsoil factor NZS 1170.5:2004 Sect. C6.5.4.2 Step 4
-# Case study building is in site subclass C.
-if periods[0] < 2.0:
-    subsoil_factor_K = 1.0
-elif 2.0 <= periods[0] <= 4.0:
-    subsoil_factor_K = (6 - periods[0]) / 4
-else:
-    subsoil_factor_K = 4
+    # Determine subsoil factor NZS 1170.5:2004 Sect. C6.5.4.2 Step 4
+    # Case study building is in site subclass C.
+    if periods[0] < 2.0:
+        subsoil_factor_K = 1.0
+    elif 2.0 <= periods[0] <= 4.0:
+        subsoil_factor_K = (6 - periods[0]) / 4
+    else:
+        subsoil_factor_K = 4
 
 
-if ductility_factor <= 3.5:
-    subsoil_factor_beta = 2 * ductility_factor * subsoil_factor_K / 3.5
-else:
-    subsoil_factor_beta = 2 * subsoil_factor_K
+    if ductility_factor <= 3.5:
+        subsoil_factor_beta = 2 * ductility_factor * subsoil_factor_K / 3.5
+    else:
+        subsoil_factor_beta = 2 * subsoil_factor_K
 
-subsoil_factor_beta = max(subsoil_factor_beta, 1.0)
+    subsoil_factor_beta = max(subsoil_factor_beta, 1.0)
 
-# When using method B, element demands need to be scaled up by subsoil_factor_beta
-pdelta_fac = subsoil_factor_beta
+    # When using method B, element demands need to be scaled up by subsoil_factor_beta
+    pdelta_fac = subsoil_factor_beta
 
-# Amplify PDelta COM displacements by subsoil_factor_beta and ductility factor
-pdelta_com_dispX *= (subsoil_factor_beta * ductility_factor)
-pdelta_com_dispY *= (subsoil_factor_beta * ductility_factor)
+    # Amplify PDelta COM displacements by subsoil_factor_beta and ductility factor
+    pdelta_com_dispX *= (subsoil_factor_beta * ductility_factor)
+    pdelta_com_dispY *= (subsoil_factor_beta * ductility_factor)
 
-# Add up COM displacements fropm MRSA & PDelta checks
-total_com_dispX = mrsa_total_com_dispX + pdelta_com_dispX
-total_com_dispY = mrsa_total_com_dispY + pdelta_com_dispY
+    # Add up COM displacements fropm MRSA & PDelta checks
+    total_com_dispX = mrsa_total_com_dispX + pdelta_com_dispX
+    total_com_dispY = mrsa_total_com_dispY + pdelta_com_dispY
 
-# Compute total interstory displacements
-total_inter_story_dispX = np.insert(np.diff(total_com_dispX), 0, total_com_dispX[0])
-total_inter_story_dispY = np.insert(np.diff(total_com_dispY), 0, total_com_dispY[0])
+    # Compute total interstory displacements
+    total_inter_story_dispX = np.insert(np.diff(total_com_dispX), 0, total_com_dispX[0])
+    total_inter_story_dispY = np.insert(np.diff(total_com_dispY), 0, total_com_dispY[0])
 
-# Compute story drift ratios
-story_driftX  = total_inter_story_dispX / story_heights * 100
-story_driftY  = total_inter_story_dispY / story_heights * 100
+    # Compute story drift ratios
+    story_driftX  = total_inter_story_dispX / story_heights * 100
+    story_driftY  = total_inter_story_dispY / story_heights * 100
 
-# Amplify story drift ration by drift factor
-story_driftX *= drift_modif_fac
-story_driftY *= drift_modif_fac
+    # Amplify story drift ration by drift factor
+    story_driftX *= drift_modif_fac
+    story_driftY *= drift_modif_fac
 
-check_drift_and_stability(story_driftX, story_driftY)
+    check_drift_and_stability(story_driftX, story_driftY)
 
 
 # CHECK STRENGTH REQUIREMENTS
 
 # Save story drifts
-np.savetxt('driftX.txt', story_driftX, fmt='%.2f')
-np.savetxt('driftY.txt', story_driftY, fmt='%.2f')
+np.savetxt('driftX-PDeltaMethod{}.txt'.format(pdelta_method), story_driftX, fmt='%.2f')
+np.savetxt('driftY-PDeltaMethod{}.txt'.format(pdelta_method), story_driftY, fmt='%.2f')
 
 # ============================================================================
 # Post-process MRSA & accidental torsion results
@@ -1285,67 +1283,92 @@ accid_torsion_baseShear_neg_Y = np.loadtxt('./accidental_torsion_results/negativ
 base_shearX = max((mrsa_base_shearX + accid_torsion_baseShear_pos_X), (mrsa_base_shearX + accid_torsion_baseShear_neg_X))
 base_shearY = max((mrsa_base_shearY + accid_torsion_baseShear_pos_Y), (mrsa_base_shearY + accid_torsion_baseShear_neg_Y))
 
-# # Generate story drift plots
-# fig, ax = plt.subplots(1, 2, figsize=(6.0, 7.5), sharex=True, sharey=True, constrained_layout=True)
-# fig.suptitle('Story drift ratios', fontdict=title_font)
+# Generate story drift plots
+fig, ax = plt.subplots(1, 2, figsize=(6.0, 7.5), sharex=True, sharey=True, constrained_layout=True)
+fig.suptitle('Story drift ratios - PDelta Method {}'.format(pdelta_method), fontdict=title_font)
 
-# ax[0].vlines(story_driftX[0], 0.0, elev[0])
-# ax[1].vlines(story_driftY[0], 0.0, elev[0])
+ax[0].vlines(story_driftX[0], 0.0, elev[0])
+ax[1].vlines(story_driftY[0], 0.0, elev[0])
 
-# for ii in range(1, len(story_driftX)):
-#     ax[0].hlines(elev[ii-1], story_driftX[ii-1], story_driftX[ii])
-#     ax[0].vlines(story_driftX[ii],  elev[ii-1], elev[ii])
+for ii in range(1, len(story_driftX)):
+    ax[0].hlines(elev[ii-1], story_driftX[ii-1], story_driftX[ii])
+    ax[0].vlines(story_driftX[ii],  elev[ii-1], elev[ii])
 
-#     ax[1].hlines(elev[ii-1], story_driftY[ii-1], story_driftY[ii])  # Correct
-#     ax[1].vlines(story_driftY[ii],  elev[ii-1], elev[ii])
-
-
-# ax[0].set_title('X - Direction', fontsize=12, family='Times New Roman')
-# ax[1].set_title('Y- Direction', fontsize=12, family='Times New Roman')
-
-# ax[0].set_ylabel('Story elevation (m)', fontdict=axes_font)
-
-# for axx in ax.flat:
-#     axx.set_xlim(0.0)
-#     axx.set_ylim(0.0, elev[-1])
-
-#     axx.grid(True, which='major', axis='both', ls='-.', linewidth=0.6)
-
-#     axx.set_yticks(elev)
-
-#     axx.set_xlabel('Story drift ratio (%)', fontdict=axes_font)
-
-#     axx.yaxis.set_major_formatter(StrMethodFormatter('{x:,.1f}'))
-#     axx.tick_params(axis='both', direction='in', colors='grey', labelcolor='grey', zorder=3.0, labelsize=8.0)
-
-# # plt.savefig('DriftPlots.png', dpi=1200)
+    ax[1].hlines(elev[ii-1], story_driftY[ii-1], story_driftY[ii])  # Correct
+    ax[1].vlines(story_driftY[ii],  elev[ii-1], elev[ii])
 
 
-# # Compute wall reinforcing ratios
-# steel_fy = 500 * MPa
-# wall_reinf_ratio = pd.DataFrame(index=wall_mom_X.index, columns=wall_mom_X.columns)
+ax[0].set_title('X - Direction', fontsize=12, family='Times New Roman')
+ax[1].set_title('Y- Direction', fontsize=12, family='Times New Roman')
 
-# wall_index = 0
+ax[0].set_ylabel('Story elevation (m)', fontdict=axes_font)
 
-# for col in wall_mom_X:
+for axx in ax.flat:
+    axx.set_xlim(0.0)
+    axx.set_ylim(0.0, elev[-1])
 
-#     num_floors = wall_mom_X.shape[0]
-#     reinf_ratio = np.zeros(num_floors)
+    axx.grid(True, which='major', axis='both', ls='-.', linewidth=0.6)
 
-#     wall_mom = wall_mom_X[col].to_numpy()
-#     wall_load = -1.0 * wall_axialLoad_X[col].to_numpy()
+    axx.set_yticks(elev)
 
-#     for ii in range(num_floors):
-#         reinf_ratio[ii] = get_wall_reinf_ratio(wall_prop[wall_index][0], wall_prop[wall_index][1],
-#                               wall_load[ii], wall_mom[ii], conc_fcp, steel_fy, steelE)
+    axx.set_xlabel('Story drift ratio (%)', fontdict=axes_font)
 
-#     wall_reinf_ratio[col] = reinf_ratio
-#     wall_index += 1
+    axx.yaxis.set_major_formatter(StrMethodFormatter('{x:,.1f}'))
+    axx.tick_params(axis='both', direction='in', colors='grey', labelcolor='grey', zorder=3.0, labelsize=8.0)
 
-# wall_Pdel_posX = np.loadtxt('./accidental_torsion_results/positiveX/floor01_wallResp.txt')
-# wall_Pdel_posY = np.loadtxt('./accidental_torsion_results/positiveY/floor01_wallResp.txt')
-# wall_Pdel_negY = np.loadtxt('./accidental_torsion_results/negativeY/floor01_wallResp.txt')
-# wall_Pdel_negX = np.loadtxt('./accidental_torsion_results/negativeX/floor01_wallResp.txt')
+# plt.savefig('DriftPlots-PDeltaMethod{}.png'.format(pdelta_method), dpi=1200)
 
-# wall1_demm = mrsa_flr_1_demands[:12] + wall_Pdel_posX[:12]
-# """
+
+# Compute wall reinforcing ratios
+steel_fy = 500 * MPa
+wall_reinf_ratio = pd.DataFrame(index=wall_mom_X.index, columns=wall_mom_X.columns)
+
+wall_index = 0
+
+for col in wall_mom_X:
+
+    num_floors = wall_mom_X.shape[0]
+    reinf_ratio = np.zeros(num_floors)
+
+    wall_mom = wall_mom_X[col].to_numpy()
+    wall_load = wall_axialLoad_X[col].to_numpy()
+
+    for ii in range(num_floors):
+        reinf_ratio[ii] = get_wall_reinf_ratio(wall_prop[wall_index][0], wall_prop[wall_index][1],
+                             wall_load[ii], wall_mom[ii], conc_fcp, steel_fy, steelE)
+
+    wall_reinf_ratio[col] = reinf_ratio
+    wall_index += 1
+
+
+# wall_prop = np.array([[7.550, .300],
+#                       [7.305, .300],
+#                       [7.640, .300],
+#                       [3.405, .300],
+#                       [7.475, .300],
+#                       [7.305, .300],
+#                       [4.895, .300],
+#                       [7.305, .300],
+#                       [7.400, .300],
+#                       [7.400, .300]]) * m
+
+# wall_ends_dict = {'wall1_l': [0, 0],
+#                   'wall1_r': [0, wall_prop[0][0]],
+#                   'wall2_l': [21.210, 0],
+#                   'wall2_r': [21.210, wall_prop[1][0]],
+#                   'wall3_l': [21.770, 5.825],
+#                   'wall3_r': [21.770 + wall_prop[2][0], 5.825],
+#                   'wall4_l': [14.9355, 9.150],
+#                   'wall4_r': [14.9355 + wall_prop[3][0], 9.150],
+#                   'wall5_l': [0, 9.150],
+#                   'wall5_r': [0, 9.150 + wall_prop[4][0]],
+#                   'wall6_l': [13.010, 9.150],
+#                   'wall6_r': [13.010, 9.150 + wall_prop[5][0]],
+#                   'wall7_l': [16.635, 10.450],
+#                   'wall7_r': [16.635, 10.450 + wall_prop[6][0]],
+#                   'wall8_l': [12.9825, 16.625],
+#                   'wall8_r': [12.9825 + wall_prop[7][0], 16.625],
+#                   'wall9_l': [13.010, 31.025],
+#                   'wall9_r': [13.010 + wall_prop[8][0], 31.025],
+#                   'wall10_l': [22.010, 31.025],
+#                   'wall10_r': [22.010 + wall_prop[9][0], 31.025]}
