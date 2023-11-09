@@ -14,6 +14,7 @@ def modal_combo(peak_modal_resp, ang_freq, damp, num_modes):
     Obtains peak modal response using the CQC rule.
 
     Note: This function assumes that uniform damping is applied to all modes.
+    Formulas derived from Dynamics of Structures 5th Ed. Anil K Chopra - Section 13.7.1
 
     Parameters
     ----------
@@ -40,7 +41,7 @@ def modal_combo(peak_modal_resp, ang_freq, damp, num_modes):
     for ii in range(num_modes):
         for jj in range(num_modes):
             omega_i = ang_freq[ii]
-            omega_j = ang_freq [jj]
+            omega_j = ang_freq[jj]
             beta_in = omega_i / omega_j
 
             correl_coeff = ((8 * damp**2 * (1 + beta_in) * beta_in**(3/2)) /

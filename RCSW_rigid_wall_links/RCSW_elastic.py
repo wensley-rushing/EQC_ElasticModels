@@ -21,6 +21,8 @@ sys.path.append('../')
 from helper_functions.create_floor_shell import refine_mesh
 from helper_functions.create_floor_shell import create_shell
 from helper_functions.cqc_modal_combo import modal_combo
+from helper_functions.eigen_analysis import run_eigen_analysis
+from helper_functions.run_mrsa import perform_rcsw_mrsa
 from helper_functions.get_beam_col_demands import process_beam_col_resp
 from helper_functions.elf_new_zealand import nz_horiz_seismic_shear, nz_horiz_force_distribution
 from helper_functions.get_spectral_shape_factor import spectral_shape_fac
@@ -257,11 +259,12 @@ nD_mattag = 1
 plate_fiber_tag = 2
 shell_sect_tag = 1
 
-slab_stiff_modif = 0.5
-slab_thick = slab_stiff_modif * 165 * mm
+slab_thick = 165 * mm
 fiber_thick = slab_thick / 3
 
-shell_E =  26000 * MPa # Modulus of concrete
+slab_in_plane_modif = 1
+slab_out_plane_modif = 1  # 1/slab_in_plane_modif*10000
+shell_E =  slab_in_plane_modif * 26000 * MPa # Modulus of concrete
 shell_nu = 0.2  # Poisson's ratio
 
 # ============================================================================
@@ -345,7 +348,7 @@ def create_floor(elev, floor_num, floor_label=''):
 
                         # ==== Load
                         wall_self_weight = conc_rho * np.prod(wall_prop_dict[row_id]) * wall_height  # in kN
-                        ops.load(node_num, 0, 0, -wall_self_weight, 0, 0, 0)
+                        # ops.load(node_num, 0, 0, -wall_self_weight, 0, 0, 0)
 
                         # ==== Mass
                         # First time mass is added, no need to retrieve existing mass
@@ -415,13 +418,23 @@ def create_floor(elev, floor_num, floor_label=''):
         # Create COM node
         ops.node(com_node, com_x, com_y, elev)
 
-        # Impose rigid diaphragm constraint
-        ops.rigidDiaphragm(3, com_node, *floor_node_tags)
-
         # Constraints for Rigid Diaphragm Primary node
         ops.fix(com_node, 0, 0, 1, 1, 1, 0)  # dx, dy, dz, rx, ry, rz
 
-        com_node_tags[floor_num] = node_num
+        # =========================================================================
+        # Reomove wall nodes, and wall rigid element nodes before applying rigid diaphragm constraint.
+        # =========================================================================
+        # floor_nodes_minus_wall_nodes = list(set(floor_node_tags) - set(wall_ends_node_tags[floor_num]))
+        # floor_nodes_minus_wall_nodes = list(set(floor_node_tags) - set(lfre_node_tags[floor_num]))
+        # Impose rigid diaphragm constraint
+        # ops.rigidDiaphragm(3, com_node, *floor_nodes_minus_wall_nodes)
+        # =========================================================================
+
+        # # Impose rigid diaphragm constraint
+        ops.rigidDiaphragm(3, com_node, *floor_node_tags)
+
+        # Add COM node tag of current floor to dictionary
+        com_node_tags[floor_num] = com_node
 
         # Create columns & walls
         create_columns(floor_num)
@@ -671,7 +684,7 @@ def build_model():
     # ops.section('LayeredShell', shell_sect_tag, 3, plate_fiber_tag, fiber_thick, plate_fiber_tag, fiber_thick, plate_fiber_tag, fiber_thick)
 
     # https://openseespydoc.readthedocs.io/en/latest/src/elasticMembranePlateSection.html
-    ops.section('ElasticMembranePlateSection', shell_sect_tag, shell_E, shell_nu, slab_thick, 0.0, 0.1)
+    ops.section('ElasticMembranePlateSection', shell_sect_tag, shell_E, shell_nu, slab_thick, 0.0, slab_out_plane_modif)
 
     # Define geometric transformation for walls
     ops.geomTransf('Linear', wall_transf_tag, 0, 1, 0)
@@ -765,43 +778,10 @@ ops.recorder('PVD', record_direc, '-precision', 3, '-dT', 1, *['mass', 'eigen', 
 # ============================================================================
 # Eigen Analysis
 # ============================================================================
-eigen = 1
+num_modes = 10
+damping_ratio = 0.05
 
-if eigen:
-    ops.wipeAnalysis()
-    num_modes = 10
-
-    lambda_list = ops.eigen(num_modes)
-    omega_list = [np.sqrt(lam) for lam in lambda_list]
-    nat_freq = [np.sqrt(lam)/(2*np.pi) for lam in lambda_list]
-    periods = [1/freq for freq in nat_freq]
-
-    print('')
-    for ii in range(1, num_modes+1):
-        print('Mode {} Tn: {:.3f} sec'.format(ii, periods[ii-1]))
-
-    modal_prop = ops.modalProperties('-file', 'ModalReport_RCSW.txt', '-unorm', '-return')
-
-    # Apply Damping
-    damping_ratio = 0.05  # 5% Damping
-
-    # Mass and stiffness proportional damping will be applied
-    mass_prop_switch = 1.0
-    stiff_curr_switch = 1.0
-    stiff_comm_switch = 0.0  # Last committed stiffness switch
-    stiff_init_switch = 0.0  # Initial stiffness switch
-
-    # Damping coeffieicent will be compusted using the 1st & 5th modes
-    omega_i = omega_list[0]  # Angular frequency of 1st Mode
-    omega_j = omega_list[4]  # Angular frequency of 5th Mode
-
-    alpha_m = mass_prop_switch * damping_ratio * ((2*omega_i*omega_j) / (omega_i + omega_j))
-    beta_k = stiff_curr_switch * damping_ratio * (2 / (omega_i + omega_j))
-    beta_k_init = stiff_init_switch * damping_ratio * (2 / (omega_i + omega_j))
-    beta_k_comm = stiff_comm_switch * damping_ratio * (2 / (omega_i + omega_j))
-
-    ops.rayleigh(alpha_m, beta_k, beta_k_init, beta_k_comm)
-
+angular_freq, modal_prop = run_eigen_analysis(ops, num_modes, damping_ratio, './', 'RCSW')
 
 # ============================================================================
 # Gravity analysis
@@ -846,74 +826,14 @@ ops.remove('recorders')
 # ============================================================================
 # Modal Response Spectrum Analysis
 # ============================================================================
-mrsa = 1
-if mrsa:
 
-    # Load spectral accelerations and periods for response spectrum
-    spect_acc = np.loadtxt('../nz_spectral_acc.txt')
-    spect_periods = np.loadtxt('../nz_periods.txt')
+# Load spectral accelerations and periods for response spectrum
+spect_acc = np.loadtxt('../nz_spectral_acc.txt')
+spect_periods = np.loadtxt('../nz_periods.txt')
 
-    direcs = [1, 2]  # Directions for MRSA
-    axis = ['X', 'Y']
 
-    # Maintain constant gravity loads and reset time to zero
-    ops.loadConst('-time', 0.0)
-
-    for ii in range (len(direcs)):
-
-        # Create directory to save results
-        mrsa_res_folder = './mrsa_results/dir' + axis[ii] + '/'
-        os.makedirs(mrsa_res_folder, exist_ok=True)
-
-        # Create recorders for column response in direction of excitation
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor01_colResp.txt', '-precision', 9, '-region', 301, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor02_colResp.txt', '-precision', 9, '-region', 302, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor03_colResp.txt', '-precision', 9, '-region', 303, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor04_colResp.txt', '-precision', 9, '-region', 304, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor05_colResp.txt', '-precision', 9, '-region', 305, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor06_colResp.txt', '-precision', 9, '-region', 306, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor07_colResp.txt', '-precision', 9, '-region', 307, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor08_colResp.txt', '-precision', 9, '-region', 308, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor09_colResp.txt', '-precision', 9, '-region', 309, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor10_colResp.txt', '-precision', 9, '-region', 310, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor11_colResp.txt', '-precision', 9, '-region', 311, 'force')
-
-        # Create recorders for wall response in direction of excitation
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor01_wallResp.txt', '-precision', 9, '-region', 401, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor02_wallResp.txt', '-precision', 9, '-region', 402, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor03_wallResp.txt', '-precision', 9, '-region', 403, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor04_wallResp.txt', '-precision', 9, '-region', 404, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor05_wallResp.txt', '-precision', 9, '-region', 405, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor06_wallResp.txt', '-precision', 9, '-region', 406, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor07_wallResp.txt', '-precision', 9, '-region', 407, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor08_wallResp.txt', '-precision', 9, '-region', 408, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor09_wallResp.txt', '-precision', 9, '-region', 409, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor10_wallResp.txt', '-precision', 9, '-region', 410, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor11_wallResp.txt', '-precision', 9, '-region', 411, 'force')
-
-        # Create recorders to store nodal displacements at the building edges
-        ops.recorder('Node', '-file', mrsa_res_folder + 'lowerLeftCornerDisp.txt',
-                      '-node', *list(wall_ends_node_tags.loc['wall1_l'])[1:], '-dof', direcs[ii], 'disp')
-
-        ops.recorder('Node', '-file', mrsa_res_folder + 'upperRightCornerDisp.txt',
-                      '-node', *list(wall_ends_node_tags.loc['wall10_r'])[1:], '-dof', direcs[ii], 'disp')
-
-        ops.recorder('Node', '-file', mrsa_res_folder + 'lowerRightCornerDisp.txt',
-                      '-node', *list(lfre_node_tags.loc['col3'])[1:], '-dof', direcs[ii], 'disp')
-
-        # Base shear
-        ops.recorder('Node', '-file', mrsa_res_folder + 'baseShear' + axis[ii] + '.txt',
-                      '-node', *lfre_node_tags['00'].tolist(), '-dof', direcs[ii], 'reaction')
-
-        # Recorders for COM displacement
-        ops.recorder('Node', '-file', mrsa_res_folder + 'COM_disp' + axis[ii] + '.txt',
-                      '-node', *list(com_node_tags.values()), '-dof', direcs[ii], 'disp')
-
-        for jj in range(num_modes):
-            ops.responseSpectrumAnalysis(direcs[ii], '-Tn', *spect_periods, '-Sa', *spect_acc, '-mode', jj + 1)
-
-        # Shut down recorder for current direction of excitation
-        ops.remove('recorders')
+perform_rcsw_mrsa(ops, spect_acc, spect_periods, num_modes, './mrsa_results/dir',
+             wall_ends_node_tags, lfre_node_tags, com_node_tags)
 
 
 # Clear model
@@ -925,42 +845,42 @@ print('======================================================')
 # ============================================================================
 # Post-process MRSA results
 # ============================================================================
-mrsa_base_shearX = modal_combo(np.loadtxt('./mrsa_results/dirX/baseShearX.txt'), lambda_list, damping_ratio, num_modes).sum()
-mrsa_base_shearY = modal_combo(np.loadtxt('./mrsa_results/dirY/baseShearY.txt'), lambda_list, damping_ratio, num_modes).sum()
+mrsa_base_shearX = modal_combo(np.loadtxt('./mrsa_results/dirX/baseShearX.txt'), angular_freq, damping_ratio, num_modes).sum()
+mrsa_base_shearY = modal_combo(np.loadtxt('./mrsa_results/dirY/baseShearY.txt'), angular_freq, damping_ratio, num_modes).sum()
 
-mrsa_flr_1_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor01_wallResp.txt'), lambda_list, damping_ratio, num_modes)
-mrsa_flr_2_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor02_wallResp.txt'), lambda_list, damping_ratio, num_modes)
-mrsa_flr_3_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor03_wallResp.txt'), lambda_list, damping_ratio, num_modes)
-mrsa_flr_4_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor04_wallResp.txt'), lambda_list, damping_ratio, num_modes)
-mrsa_flr_5_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor05_wallResp.txt'), lambda_list, damping_ratio, num_modes)
-mrsa_flr_6_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor06_wallResp.txt'), lambda_list, damping_ratio, num_modes)
-mrsa_flr_7_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor07_wallResp.txt'), lambda_list, damping_ratio, num_modes)
-mrsa_flr_8_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor08_wallResp.txt'), lambda_list, damping_ratio, num_modes)
-mrsa_flr_9_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor09_wallResp.txt'), lambda_list, damping_ratio, num_modes)
-mrsa_flr_10_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor10_wallResp.txt'), lambda_list, damping_ratio, num_modes)
-mrsa_flr_11_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor11_wallResp.txt'), lambda_list, damping_ratio, num_modes)
+mrsa_flr_1_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor01_wallResp.txt'), angular_freq, damping_ratio, num_modes)
+mrsa_flr_2_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor02_wallResp.txt'), angular_freq, damping_ratio, num_modes)
+mrsa_flr_3_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor03_wallResp.txt'), angular_freq, damping_ratio, num_modes)
+mrsa_flr_4_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor04_wallResp.txt'), angular_freq, damping_ratio, num_modes)
+mrsa_flr_5_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor05_wallResp.txt'), angular_freq, damping_ratio, num_modes)
+mrsa_flr_6_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor06_wallResp.txt'), angular_freq, damping_ratio, num_modes)
+mrsa_flr_7_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor07_wallResp.txt'), angular_freq, damping_ratio, num_modes)
+mrsa_flr_8_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor08_wallResp.txt'), angular_freq, damping_ratio, num_modes)
+mrsa_flr_9_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor09_wallResp.txt'), angular_freq, damping_ratio, num_modes)
+mrsa_flr_10_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor10_wallResp.txt'), angular_freq, damping_ratio, num_modes)
+mrsa_flr_11_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor11_wallResp.txt'), angular_freq, damping_ratio, num_modes)
 
 flr_1_Fz = mrsa_flr_1_demands[2::12]
 flr_1_Mx = mrsa_flr_1_demands[3::12]
 
-# """
+"""
 # ============================================================================
 # Compute Torsional Irregularity Ratio (TIR)
 # ============================================================================
 # Obtain peak total response for corner node displacments
 
 # ===== MRSA - X
-lower_left_corner_dispX = modal_combo(np.loadtxt('./mrsa_results/dirX/lowerLeftCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
-upper_right_corner_dispX = modal_combo(np.loadtxt('./mrsa_results/dirX/upperRightCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
-lower_right_corner_dispX = modal_combo(np.loadtxt('./mrsa_results/dirX/lowerRightCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
+lower_left_corner_dispX = modal_combo(np.loadtxt('./mrsa_results/dirX/lowerLeftCornerDisp.txt'), angular_freq, damping_ratio, num_modes)
+upper_right_corner_dispX = modal_combo(np.loadtxt('./mrsa_results/dirX/upperRightCornerDisp.txt'), angular_freq, damping_ratio, num_modes)
+lower_right_corner_dispX = modal_combo(np.loadtxt('./mrsa_results/dirX/lowerRightCornerDisp.txt'), angular_freq, damping_ratio, num_modes)
 
 tir_x_edgeE = np.maximum(upper_right_corner_dispX, lower_right_corner_dispX) / (0.5*(upper_right_corner_dispX + lower_right_corner_dispX))  # Right edge of building plan
 tir_x_edgeF = np.maximum(lower_left_corner_dispX, lower_right_corner_dispX) / (0.5*(lower_left_corner_dispX + lower_right_corner_dispX))    # Bottom edge of building plan
 
 # ===== MRSA - Y
-lower_left_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/lowerLeftCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
-upper_right_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/upperRightCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
-lower_right_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/lowerRightCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
+lower_left_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/lowerLeftCornerDisp.txt'), angular_freq, damping_ratio, num_modes)
+upper_right_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/upperRightCornerDisp.txt'), angular_freq, damping_ratio, num_modes)
+lower_right_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/lowerRightCornerDisp.txt'), angular_freq, damping_ratio, num_modes)
 
 tir_y_edgeE = np.maximum(upper_right_corner_dispY, lower_right_corner_dispY) / (0.5*(upper_right_corner_dispY + lower_right_corner_dispY))  # Right edge of building plan
 tir_y_edgeF = np.maximum(lower_left_corner_dispY, lower_right_corner_dispY) / (0.5*(lower_left_corner_dispY + lower_right_corner_dispY))    # Bottom edge of building plan
@@ -1030,8 +950,8 @@ drift_modif_fac = 1.5  # NZS 1170.5-2004: Table 7.1
 
 # P-Delta Method B: (NZS 1170.5:2004 - Sect. 6.5.4.2 & Commentary Sect. C6.5.4.2)
 # Modal combination on peak COM displacements from MRSA
-mrsa_total_com_dispX = modal_combo(mrsa_com_dispX, lambda_list, damping_ratio, num_modes)
-mrsa_total_com_dispY = modal_combo(mrsa_com_dispY, lambda_list, damping_ratio, num_modes)
+mrsa_total_com_dispX = modal_combo(mrsa_com_dispX, angular_freq, damping_ratio, num_modes)
+mrsa_total_com_dispY = modal_combo(mrsa_com_dispY, angular_freq, damping_ratio, num_modes)
 
 # Scale COM displacements by elf-to-mrsa base shear factor # NZS 1170.5-2004: Sect 5.2.2.2b
 mrsa_total_com_dispX *= elf_mrsaX_scale_factor
@@ -1255,19 +1175,19 @@ np.savetxt('driftY.txt', story_driftY, fmt='%.2f')
 # Post-process MRSA & accidental torsion results
 # ============================================================================
 col_demands_X = process_beam_col_resp('col', './mrsa_results/dirX/', './accidental_torsion_results/positiveX/',
-                                      './accidental_torsion_results/negativeX/', lambda_list, damping_ratio,
+                                      './accidental_torsion_results/negativeX/', angular_freq, damping_ratio,
                                       num_modes, elf_mrsaX_scale_factor, pdelta_fac)
 
 col_demands_Y = process_beam_col_resp('col', './mrsa_results/dirY/', './accidental_torsion_results/positiveY/',
-                                      './accidental_torsion_results/negativeY/', lambda_list, damping_ratio,
+                                      './accidental_torsion_results/negativeY/', angular_freq, damping_ratio,
                                       num_modes, elf_mrsaY_scale_factor, pdelta_fac)
 
 wall_demands_X, wall_axialLoad_X, wall_mom_X = process_beam_col_resp('wall', './mrsa_results/dirX/', './accidental_torsion_results/positiveX/',
-                                      './accidental_torsion_results/negativeX/', lambda_list, damping_ratio,
+                                      './accidental_torsion_results/negativeX/', angular_freq, damping_ratio,
                                       num_modes, elf_mrsaX_scale_factor, pdelta_fac)
 
 wall_demands_Y, wall_axialLoad_Y, wall_mom_Y = process_beam_col_resp('wall', './mrsa_results/dirY/', './accidental_torsion_results/positiveY/',
-                                      './accidental_torsion_results/negativeY/', lambda_list, damping_ratio,
+                                      './accidental_torsion_results/negativeY/', angular_freq, damping_ratio,
                                       num_modes, elf_mrsaY_scale_factor, pdelta_fac)
 
 # Compute wall axial load ratios
@@ -1348,4 +1268,4 @@ base_shearY = max((mrsa_base_shearY + accid_torsion_baseShear_pos_Y), (mrsa_base
 # wall_Pdel_negX = np.loadtxt('./accidental_torsion_results/negativeX/floor01_wallResp.txt')
 
 # wall1_demm = mrsa_flr_1_demands[:12] + wall_Pdel_posX[:12]
-# """
+"""

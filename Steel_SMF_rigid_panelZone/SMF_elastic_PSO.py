@@ -488,9 +488,9 @@ def build_model(optim_params):
 
     num_modes = 10
 
-    lambda_list = ops.eigen(num_modes)
-    omega_list = [np.sqrt(lam) for lam in lambda_list]
-    nat_freq = [np.sqrt(lam)/(2*np.pi) for lam in lambda_list]
+    eigen_values = ops.eigen(num_modes)
+    angular_freq = [np.sqrt(lam) for lam in eigen_values]
+    nat_freq = [omega/(2*np.pi) for omega in angular_freq]
     periods = [1/freq for freq in nat_freq]
 
     # Apply Damping
@@ -503,8 +503,8 @@ def build_model(optim_params):
     stiff_init_switch = 0.0  # Initial stiffness switch
 
     # Damping coeffieicent will be compusted using the 1st & 5th modes
-    omega_i = omega_list[0]  # Angular frequency of 1st Mode
-    omega_j = omega_list[4]  # Angular frequency of 5th Mode
+    omega_i = angular_freq[0]  # Angular frequency of 1st Mode
+    omega_j = angular_freq[4]  # Angular frequency of 5th Mode
 
     alpha_m = mass_prop_switch * damping_ratio * ((2*omega_i*omega_j) / (omega_i + omega_j))
     beta_k = stiff_curr_switch * damping_ratio * (2 / (omega_i + omega_j))
@@ -566,8 +566,8 @@ def build_model(optim_params):
     # ============================================================================
     # Post-process MRSA results
     # ============================================================================
-    mrsa_base_shearX = modal_combo(np.loadtxt('./optimization_results/mrsa_results/dirX/baseShearX.txt'), lambda_list, damping_ratio, num_modes).sum()
-    mrsa_base_shearY = modal_combo(np.loadtxt('./optimization_results/mrsa_results/dirY/baseShearY.txt'), lambda_list, damping_ratio, num_modes).sum()
+    mrsa_base_shearX = modal_combo(np.loadtxt('./optimization_results/mrsa_results/dirX/baseShearX.txt'), angular_freq, damping_ratio, num_modes).sum()
+    mrsa_base_shearY = modal_combo(np.loadtxt('./optimization_results/mrsa_results/dirY/baseShearY.txt'), angular_freq, damping_ratio, num_modes).sum()
 
     # ============================================================================
     # Perform ELF
@@ -607,11 +607,11 @@ def build_model(optim_params):
     # Compute story drifts
     # For MRSA in x-direction
     com_dispX = np.loadtxt('./optimization_results/mrsa_results/dirX/COM_dispX.txt')
-    story_driftX = compute_story_drifts(com_dispX, story_heights, lambda_list, damping_ratio, num_modes)
+    story_driftX = compute_story_drifts(com_dispX, story_heights, angular_freq, damping_ratio, num_modes)
 
     # For MRSA in y-direction
     com_dispY = np.loadtxt('./optimization_results/mrsa_results/dirY/COM_dispY.txt')
-    story_driftY = compute_story_drifts(com_dispY, story_heights, lambda_list, damping_ratio, num_modes)
+    story_driftY = compute_story_drifts(com_dispY, story_heights, angular_freq, damping_ratio, num_modes)
 
     # Amplify drifts by required factors
     story_driftX *=  (elf_mrsaX_scale_factor * ductility_factor * pdelta_fac * drift_modif_fac)

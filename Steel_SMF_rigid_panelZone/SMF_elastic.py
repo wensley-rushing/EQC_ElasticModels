@@ -538,9 +538,9 @@ if eigen:
     ops.wipeAnalysis()
     num_modes = 10
 
-    lambda_list = ops.eigen(num_modes)
-    omega_list = [np.sqrt(lam) for lam in lambda_list]
-    nat_freq = [np.sqrt(lam)/(2*np.pi) for lam in lambda_list]
+    eigen_values = ops.eigen(num_modes)
+    angular_freq = [np.sqrt(lam) for lam in eigen_values]
+    nat_freq = [omega/(2*np.pi) for omega in angular_freq]
     periods = [1/freq for freq in nat_freq]
 
     print('')
@@ -573,8 +573,8 @@ if eigen:
     stiff_init_switch = 0.0  # Initial stiffness switch
 
     # Damping coeffieicent will be compusted using the 1st & 5th modes
-    omega_i = omega_list[0]  # Angular frequency of 1st Mode
-    omega_j = omega_list[4]  # Angular frequency of 5th Mode
+    omega_i = angular_freq[0]  # Angular frequency of 1st Mode
+    omega_j = angular_freq[4]  # Angular frequency of 5th Mode
 
     alpha_m = mass_prop_switch * damping_ratio * ((2*omega_i*omega_j) / (omega_i + omega_j))
     beta_k = stiff_curr_switch * damping_ratio * (2 / (omega_i + omega_j))
@@ -692,17 +692,17 @@ print('======================================================')
 # Obtain peak total response for corner node displacments
 
 # ===== MRSA - X
-lower_left_corner_dispX = modal_combo(np.loadtxt('./mrsa_results/dirX/lowerLeftCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
-upper_right_corner_dispX = modal_combo(np.loadtxt('./mrsa_results/dirX/upperRightCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
-lower_right_corner_dispX = modal_combo(np.loadtxt('./mrsa_results/dirX/lowerRightCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
+lower_left_corner_dispX = modal_combo(np.loadtxt('./mrsa_results/dirX/lowerLeftCornerDisp.txt'), angular_freq, damping_ratio, num_modes)
+upper_right_corner_dispX = modal_combo(np.loadtxt('./mrsa_results/dirX/upperRightCornerDisp.txt'), angular_freq, damping_ratio, num_modes)
+lower_right_corner_dispX = modal_combo(np.loadtxt('./mrsa_results/dirX/lowerRightCornerDisp.txt'), angular_freq, damping_ratio, num_modes)
 
 tir_x_edgeE = np.maximum(upper_right_corner_dispX, lower_right_corner_dispX) / (0.5*(upper_right_corner_dispX + lower_right_corner_dispX))  # Right edge of building plan
 tir_x_edgeF = np.maximum(lower_left_corner_dispX, lower_right_corner_dispX) / (0.5*(lower_left_corner_dispX + lower_right_corner_dispX))    # Bottom edge of building plan
 
 # ===== MRSA - Y
-lower_left_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/lowerLeftCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
-upper_right_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/upperRightCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
-lower_right_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/lowerRightCornerDisp.txt'), lambda_list, damping_ratio, num_modes)
+lower_left_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/lowerLeftCornerDisp.txt'), angular_freq, damping_ratio, num_modes)
+upper_right_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/upperRightCornerDisp.txt'), angular_freq, damping_ratio, num_modes)
+lower_right_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/lowerRightCornerDisp.txt'), angular_freq, damping_ratio, num_modes)
 
 tir_y_edgeE = np.maximum(upper_right_corner_dispY, lower_right_corner_dispY) / (0.5*(upper_right_corner_dispY + lower_right_corner_dispY))  # Right edge of building plan
 tir_y_edgeF = np.maximum(lower_left_corner_dispY, lower_right_corner_dispY) / (0.5*(lower_left_corner_dispY + lower_right_corner_dispY))    # Bottom edge of building plan
@@ -710,8 +710,8 @@ tir_y_edgeF = np.maximum(lower_left_corner_dispY, lower_right_corner_dispY) / (0
 # ============================================================================
 # Post-process MRSA results
 # ============================================================================
-mrsa_base_shearX = modal_combo(np.loadtxt('./mrsa_results/dirX/baseShearX.txt'), lambda_list, damping_ratio, num_modes).sum()
-mrsa_base_shearY = modal_combo(np.loadtxt('./mrsa_results/dirY/baseShearY.txt'), lambda_list, damping_ratio, num_modes).sum()
+mrsa_base_shearX = modal_combo(np.loadtxt('./mrsa_results/dirX/baseShearX.txt'), angular_freq, damping_ratio, num_modes).sum()
+mrsa_base_shearY = modal_combo(np.loadtxt('./mrsa_results/dirY/baseShearY.txt'), angular_freq, damping_ratio, num_modes).sum()
 
 # ============================================================================
 # Perform ELF
@@ -780,8 +780,8 @@ pdelta_method = "B"
 if pdelta_method == "A":  # (NZS 1170.5:2004 - Sect. 6.5.4.1)
 
     # Compute story drifts
-    story_driftX = compute_story_drifts(mrsa_com_dispX, story_heights, lambda_list, damping_ratio, num_modes)
-    story_driftY = compute_story_drifts(mrsa_com_dispY, story_heights, lambda_list, damping_ratio, num_modes)
+    story_driftX = compute_story_drifts(mrsa_com_dispX, story_heights, angular_freq, damping_ratio, num_modes)
+    story_driftY = compute_story_drifts(mrsa_com_dispY, story_heights, angular_freq, damping_ratio, num_modes)
 
     # Scale drifts by elf-to-mrsa base shear factor # NZS 1170.5-2004: Sect 5.2.2.2b
     story_driftX *= elf_mrsaX_scale_factor
@@ -801,8 +801,8 @@ if pdelta_method == "A":  # (NZS 1170.5:2004 - Sect. 6.5.4.1)
 else: # Method B (NZS 1170.5:2004 - Sect. 6.5.4.2 & Commentary Sect. C6.5.4.2)
 
     # Modal combination on peak COM displacements from MRSA
-    mrsa_total_com_dispX = modal_combo(mrsa_com_dispX, lambda_list, damping_ratio, num_modes)
-    mrsa_total_com_dispY = modal_combo(mrsa_com_dispY, lambda_list, damping_ratio, num_modes)
+    mrsa_total_com_dispX = modal_combo(mrsa_com_dispX, angular_freq, damping_ratio, num_modes)
+    mrsa_total_com_dispY = modal_combo(mrsa_com_dispY, angular_freq, damping_ratio, num_modes)
 
     # Scale COM displacements by elf-to-mrsa base shear factor # NZS 1170.5-2004: Sect 5.2.2.2b
     mrsa_total_com_dispX *= elf_mrsaX_scale_factor
@@ -1010,19 +1010,19 @@ np.savetxt('driftY-PDeltaMethod{}.txt'.format(pdelta_method), story_driftY, fmt=
 # Post-process MRSA & accidental torsion results
 # ============================================================================
 beam_demands_X = process_beam_col_resp('beam', './mrsa_results/dirX/', './accidental_torsion_results/positiveX/',
-                                      './accidental_torsion_results/negativeX/', lambda_list, damping_ratio,
+                                      './accidental_torsion_results/negativeX/', angular_freq, damping_ratio,
                                       num_modes, elf_mrsaX_scale_factor, pdelta_fac)
 
 beam_demands_Y = process_beam_col_resp('beam', './mrsa_results/dirY/', './accidental_torsion_results/positiveY/',
-                                      './accidental_torsion_results/negativeY/', lambda_list, damping_ratio,
+                                      './accidental_torsion_results/negativeY/', angular_freq, damping_ratio,
                                       num_modes, elf_mrsaY_scale_factor, pdelta_fac)
 
 col_demands_X = process_beam_col_resp('col', './mrsa_results/dirX/', './accidental_torsion_results/positiveX/',
-                                      './accidental_torsion_results/negativeX/', lambda_list, damping_ratio,
+                                      './accidental_torsion_results/negativeX/', angular_freq, damping_ratio,
                                       num_modes, elf_mrsaX_scale_factor, pdelta_fac)
 
 col_demands_Y = process_beam_col_resp('col', './mrsa_results/dirY/', './accidental_torsion_results/positiveY/',
-                                      './accidental_torsion_results/negativeY/', lambda_list, damping_ratio, num_modes,
+                                      './accidental_torsion_results/negativeY/', angular_freq, damping_ratio, num_modes,
                                       elf_mrsaY_scale_factor, pdelta_fac)
 
 # Base shear due to static accidental torsion analysis
