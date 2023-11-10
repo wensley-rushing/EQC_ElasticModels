@@ -25,6 +25,7 @@ def run_eigen_analysis(ops, num_modes, damping_ratio, report_folder, lfre_system
 
     # Apply Damping
     # Mass and stiffness proportional damping will be applied
+
     mass_prop_switch = 1.0
     stiff_curr_switch = 1.0
     stiff_comm_switch = 0.0  # Last committed stiffness switch

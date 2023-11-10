@@ -25,6 +25,7 @@ from helper_functions.rcsw_wall_rigid_links import create_wall_rigid_links
 from helper_functions.eigen_analysis import run_eigen_analysis
 from helper_functions.cqc_modal_combo import modal_combo
 from helper_functions.run_mrsa import perform_rcsw_mrsa
+from helper_functions.rcsw_mrsa_demands import get_mrsa_wall_demands, get_mrsa_wall_rigid_links_demands
 
 from helper_functions.get_beam_col_demands import process_beam_col_resp
 from helper_functions.elf_new_zealand import nz_horiz_seismic_shear, nz_horiz_force_distribution
@@ -216,7 +217,7 @@ col_wall_x_coords = np.array(list(col_wall_x_coords))
 col_wall_y_coords = np.array(list(col_wall_y_coords))
 
 # Create finer mesh
-discretize = 0
+discretize = 1
 if discretize:
     mesh_size = 1.5 * m  # Mesh size
     x_coords = refine_mesh(col_wall_x_coords, mesh_size)
@@ -263,7 +264,6 @@ plate_fiber_tag = 2
 shell_sect_tag = 1
 
 slab_thick = 165 * mm
-fiber_thick = slab_thick / 3
 
 slab_in_plane_modif = 1
 slab_out_plane_modif = 1
@@ -277,12 +277,10 @@ shell_nu = 0.2  # Poisson's ratio
 com_node_tags = {}
 total_floor_mass = {}
 
-
 # ============================================================================
 # Define function to create a floor
 # ============================================================================
 
-# Create floor
 def create_floor(elev, floor_num, floor_label=''):
 
     node_compile = []  # Store node tags grouped according to their y-coordinates
@@ -361,7 +359,6 @@ def create_floor(elev, floor_num, floor_label=''):
 
                 # Assign node tag to `wall_ends_node_tags`
                 wall_ends_node_tags.loc[row_id][floor_num] = node_num
-
 
             # Move to next node
             node_list.append(node_num)
@@ -475,7 +472,7 @@ def create_walls(floor_num):
 
 
 # ============================================================================
-# Create material/geometric properties for wall rigid links
+# Define material/geometric properties for wall rigid links
 # ============================================================================
 bm_nu = 0.28  # Poisson's ratio for steel
 bm_d = 602 * mm
@@ -602,7 +599,7 @@ def build_model():
     create_floor(roof_flr, '11', 'Roof')
 
     # ============================================================================
-    # Create regions for steel columns & RC Walls based on floor
+    # Create regions for steel columns & RC Walls & rigid wall links based on floor
     # ============================================================================
     # Get all element tags
     elem_tags = ops.getEleTags()
@@ -612,10 +609,12 @@ def build_model():
 
     col_tags = []
     wall_tags = []
+    wall_rigid_link_tags = []
 
     for floor in floor_nums:
         floor_col_tags = []
         floor_wall_tags = []
+        floor_wall_rigid_link_tags = []
 
         for tag in elem_tags:
 
@@ -627,8 +626,13 @@ def build_model():
             elif str(tag).startswith('4' + floor):
                 floor_wall_tags.append(tag)
 
+            # Only select wall rigid link elements
+            elif str(tag).startswith('5' + floor):
+                floor_wall_rigid_link_tags.append(tag)
+
         col_tags.append(floor_col_tags)
         wall_tags.append(floor_wall_tags)
+        wall_rigid_link_tags.append(floor_wall_rigid_link_tags)
 
     # Columns
     ops.region(301, '-eleOnly', *col_tags[0])  # Region for all columns on 1st floor
@@ -656,6 +660,18 @@ def build_model():
     ops.region(410, '-eleOnly', *wall_tags[9])  # Region for all walls on 10th floor
     ops.region(411, '-eleOnly', *wall_tags[10]) # Region for all walls on 11th floor
 
+    # Wall rigid links
+    ops.region(501, '-eleOnly', *wall_rigid_link_tags[0])  # Region for all wall rigid links on 1st floor
+    ops.region(502, '-eleOnly', *wall_rigid_link_tags[1])  # Region for all wall rigid links on 2nd floor
+    ops.region(503, '-eleOnly', *wall_rigid_link_tags[2])  # Region for all wall rigid links on 3rd floor
+    ops.region(504, '-eleOnly', *wall_rigid_link_tags[3])  # Region for all wall rigid links on 4th floor
+    ops.region(505, '-eleOnly', *wall_rigid_link_tags[4])  # Region for all wall rigid links on 5th floor
+    ops.region(506, '-eleOnly', *wall_rigid_link_tags[5])  # Region for all wall rigid links on 6th floor
+    ops.region(507, '-eleOnly', *wall_rigid_link_tags[6])  # Region for all wall rigid links on 7th floor
+    ops.region(508, '-eleOnly', *wall_rigid_link_tags[7])  # Region for all wall rigid links on 8th floor
+    ops.region(509, '-eleOnly', *wall_rigid_link_tags[8])  # Region for all wall rigid links on 9th floor
+    ops.region(510, '-eleOnly', *wall_rigid_link_tags[9])  # Region for all wall rigid links on 10th floor
+    ops.region(511, '-eleOnly', *wall_rigid_link_tags[10])  # Region for all wall rigid links on 11th floor
 
 # Generate model
 build_model()
@@ -696,7 +712,9 @@ ops.analyze(num_step_sWgt)
 # Shut down gravity recorders
 ops.remove('recorders')
 
-"""
+# Load reaction forces due to gravity
+grav_rxn_forces = np.loadtxt(grav_direc + 'nodeRxn.txt').T
+
 # ============================================================================
 # Modal Response Spectrum Analysis
 # ============================================================================
@@ -722,22 +740,28 @@ print('======================================================')
 mrsa_base_shearX = modal_combo(np.loadtxt('./mrsa_results/dirX/baseShearX.txt'), angular_freq, damping_ratio, num_modes).sum()
 mrsa_base_shearY = modal_combo(np.loadtxt('./mrsa_results/dirY/baseShearY.txt'), angular_freq, damping_ratio, num_modes).sum()
 
-mrsa_flr_1_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor01_wallResp.txt'), angular_freq, damping_ratio, num_modes)
-mrsa_flr_2_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor02_wallResp.txt'), angular_freq, damping_ratio, num_modes)
-mrsa_flr_3_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor03_wallResp.txt'), angular_freq, damping_ratio, num_modes)
-mrsa_flr_4_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor04_wallResp.txt'), angular_freq, damping_ratio, num_modes)
-mrsa_flr_5_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor05_wallResp.txt'), angular_freq, damping_ratio, num_modes)
-mrsa_flr_6_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor06_wallResp.txt'), angular_freq, damping_ratio, num_modes)
-mrsa_flr_7_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor07_wallResp.txt'), angular_freq, damping_ratio, num_modes)
-mrsa_flr_8_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor08_wallResp.txt'), angular_freq, damping_ratio, num_modes)
-mrsa_flr_9_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor09_wallResp.txt'), angular_freq, damping_ratio, num_modes)
-mrsa_flr_10_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor10_wallResp.txt'), angular_freq, damping_ratio, num_modes)
-mrsa_flr_11_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor11_wallResp.txt'), angular_freq, damping_ratio, num_modes)
+# Get MRSA demands in walls
+[mrsaX_wall_Fx, mrsaX_wall_Fy,  mrsaX_wall_Fz,
+  mrsaX_wall_Mx,  mrsaX_wall_My,  mrsaX_wall_Mz] =  get_mrsa_wall_demands(modal_combo, './mrsa_results/dirX/', angular_freq,
+                                                                          damping_ratio, num_modes)
 
-flr_1_Fz = mrsa_flr_1_demands[2::12]
-flr_1_Mx = mrsa_flr_1_demands[3::12]
+[mrsaY_wall_Fx, mrsaY_wall_Fy,  mrsaY_wall_Fz,
+  mrsaY_wall_Mx,  mrsaY_wall_My,  mrsaY_wall_Mz] =  get_mrsa_wall_demands(modal_combo, './mrsa_results/dirY/', angular_freq,
+                                                                          damping_ratio, num_modes)
+
+# Get MRSA demands in wall rigid links
+[mrsaX_wall_Links_Fx, mrsaX_wall_Links_Fy,
+  mrsaX_wall_Links_Fz, mrsaX_wall_Links_Mx,
+  mrsaX_wall_Links_My,  mrsaX_wall_Links_Mz] = get_mrsa_wall_rigid_links_demands(modal_combo, './mrsa_results/dirX/', angular_freq,
+                                                                                 damping_ratio, num_modes)
+
+[mrsaY_wall_Links_Fx, mrsaY_wall_Links_Fy,
+  mrsaY_wall_Links_Fz, mrsaY_wall_Links_Mx,
+  mrsaY_wall_Links_My,  mrsaY_wall_Links_Mz] = get_mrsa_wall_rigid_links_demands(modal_combo, './mrsa_results/dirX/', angular_freq,
+                                                                                 damping_ratio, num_modes)
 
 
+"""
 # ============================================================================
 # Compute Torsional Irregularity Ratio (TIR)
 # ============================================================================

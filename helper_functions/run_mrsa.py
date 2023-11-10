@@ -49,6 +49,21 @@ def perform_rcsw_mrsa(ops, spect_acc, spect_periods, num_modes, results_direc,
         ops.recorder('Element', '-file', mrsa_res_folder + 'floor10_wallResp.txt', '-precision', 9, '-region', 410, 'force')
         ops.recorder('Element', '-file', mrsa_res_folder + 'floor11_wallResp.txt', '-precision', 9, '-region', 411, 'force')
 
+        # Create recorders for wall rigid links in direction of excitation
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor01_wallRigidLinkResp.txt', '-precision', 9, '-region', 501, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor02_wallRigidLinkResp.txt', '-precision', 9, '-region', 502, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor03_wallRigidLinkResp.txt', '-precision', 9, '-region', 503, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor04_wallRigidLinkResp.txt', '-precision', 9, '-region', 504, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor05_wallRigidLinkResp.txt', '-precision', 9, '-region', 505, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor06_wallRigidLinkResp.txt', '-precision', 9, '-region', 506, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor07_wallRigidLinkResp.txt', '-precision', 9, '-region', 507, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor08_wallRigidLinkResp.txt', '-precision', 9, '-region', 508, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor09_wallRigidLinkResp.txt', '-precision', 9, '-region', 509, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor10_wallRigidLinkResp.txt', '-precision', 9, '-region', 510, 'force')
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor11_wallRigidLinkResp.txt', '-precision', 9, '-region', 511, 'force')
+
+        ops.recorder('Element', '-file', mrsa_res_folder + 'floor01_wallRigid2elem.txt', '-precision', 9, '-ele', 50101, 50102, 'force')
+
         # Create recorders to store nodal displacements at the building edges
         ops.recorder('Node', '-file', mrsa_res_folder + 'lowerLeftCornerDisp.txt',
                       '-node', *list(wall_ends_node_tags.loc['wall1_l'])[1:], '-dof', direcs[ii], 'disp')
@@ -63,9 +78,9 @@ def perform_rcsw_mrsa(ops, spect_acc, spect_periods, num_modes, results_direc,
         ops.recorder('Node', '-file', mrsa_res_folder + 'baseShear' + axis[ii] + '.txt',
                       '-node', *lfre_node_tags['00'].tolist(), '-dof', direcs[ii], 'reaction')
 
-        # Recorders for COM displacement
-        ops.recorder('Node', '-file', mrsa_res_folder + 'COM_disp' + axis[ii] + '.txt',
-                      '-node', *list(com_node_tags.values()), '-dof', direcs[ii], 'disp')
+        # # Recorders for COM displacement
+        # ops.recorder('Node', '-file', mrsa_res_folder + 'COM_disp' + axis[ii] + '.txt',
+        #               '-node', *list(com_node_tags.values()), '-dof', direcs[ii], 'disp')
 
         for jj in range(num_modes):
             ops.responseSpectrumAnalysis(direcs[ii], '-Tn', *spect_periods, '-Sa', *spect_acc, '-mode', jj + 1)
