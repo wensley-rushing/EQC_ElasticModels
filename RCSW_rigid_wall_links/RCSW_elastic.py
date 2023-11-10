@@ -21,9 +21,11 @@ sys.path.append('../')
 from helper_functions.create_floor_shell import refine_mesh
 from helper_functions.create_floor_shell import create_shell
 from helper_functions.rcsw_wall_rigid_links import create_wall_rigid_links
-from helper_functions.cqc_modal_combo import modal_combo
+
 from helper_functions.eigen_analysis import run_eigen_analysis
+from helper_functions.cqc_modal_combo import modal_combo
 from helper_functions.run_mrsa import perform_rcsw_mrsa
+
 from helper_functions.get_beam_col_demands import process_beam_col_resp
 from helper_functions.elf_new_zealand import nz_horiz_seismic_shear, nz_horiz_force_distribution
 from helper_functions.get_spectral_shape_factor import spectral_shape_fac
@@ -415,15 +417,6 @@ def create_floor(elev, floor_num, floor_label=''):
         # Constraints for Rigid Diaphragm Primary node
         # ops.fix(com_node, 0, 0, 1, 1, 1, 0)  # dx, dy, dz, rx, ry, rz
 
-        # =========================================================================
-        # Reomove wall nodes, and wall rigid element nodes before applying rigid diaphragm constraint.
-        # =========================================================================
-        # floor_nodes_minus_wall_nodes = list(set(floor_node_tags) - set(wall_ends_node_tags[floor_num]))
-        # floor_nodes_minus_wall_nodes = list(set(floor_node_tags) - set(lfre_node_tags[floor_num]))
-        # Impose rigid diaphragm constraint
-        # ops.rigidDiaphragm(3, com_node, *floor_nodes_minus_wall_nodes)
-        # =========================================================================
-
         # # Impose rigid diaphragm constraint
         # ops.rigidDiaphragm(3, com_node, *floor_node_tags)
 
@@ -580,10 +573,6 @@ def build_model():
     ops.model('basic', '-ndm', 3, '-ndf', 6)
 
     # Create shell material for floor diaphragm
-    # ops.nDMaterial('ElasticIsotropic', nD_mattag, shell_E, shell_nu)
-    # ops.nDMaterial('PlateFiber', plate_fiber_tag, nD_mattag)
-    # ops.section('LayeredShell', shell_sect_tag, 3, plate_fiber_tag, fiber_thick, plate_fiber_tag, fiber_thick, plate_fiber_tag, fiber_thick)
-
     # https://openseespydoc.readthedocs.io/en/latest/src/elasticMembranePlateSection.html
     ops.section('ElasticMembranePlateSection', shell_sect_tag, shell_E, shell_nu, slab_thick, 0.0, slab_out_plane_modif)
 
@@ -690,26 +679,10 @@ angular_freq, modal_prop = run_eigen_analysis(ops, num_modes, damping_ratio, './
 # Create recorder
 grav_direc = './gravity_results/'
 os.makedirs(grav_direc, exist_ok=True)
-
-ops.recorder('Element', '-file', grav_direc + 'colFx.txt', '-ele', 30110, 30111, 30112, '-dof', 1,2, 3, 4, 5, 6, 'globalForce')
+ops.recorder('Element', '-file', grav_direc + 'colForces.txt', '-region', 301, '-dof', 1,2, 3, 4, 5, 6, 'globalForce')
 ops.recorder('Node', '-file', grav_direc + 'nodeRxn.txt', '-node', *lfre_node_tags['00'].tolist(), '-dof', 3, 'reaction')
 
-# Recorders to check correct implementation of boundary condtions for gravity columns
-# ops.recorder('Element', '-file', grav_direc + 'floor01_colResp.txt', '-region', 301, 'force')
-# ops.recorder('Element', '-file', grav_direc + 'floor02_colResp.txt', '-region', 302, 'force')
-# ops.recorder('Element', '-file', grav_direc + 'floor03_colResp.txt', '-region', 303, 'force')
-# ops.recorder('Element', '-file', grav_direc + 'floor04_colResp.txt', '-region', 304, 'force')
-# ops.recorder('Element', '-file', grav_direc + 'floor05_colResp.txt', '-region', 305, 'force')
-# ops.recorder('Element', '-file', grav_direc + 'floor06_colResp.txt', '-region', 306, 'force')
-# ops.recorder('Element', '-file', grav_direc + 'floor07_colResp.txt', '-region', 307, 'force')
-# ops.recorder('Element', '-file', grav_direc + 'floor08_colResp.txt', '-region', 308, 'force')
-# ops.recorder('Element', '-file', grav_direc + 'floor09_colResp.txt', '-region', 309, 'force')
-# ops.recorder('Element', '-file', grav_direc + 'floor10_colResp.txt', '-region', 310, 'force')
-# ops.recorder('Element', '-file', grav_direc + 'floor11_colResp.txt', '-region', 311, 'force')
-
-
 num_step_sWgt = 1     # Set weight increments
-
 ops.constraints('Penalty', 1.0e17, 1.0e17)
 ops.test('NormDispIncr', 1e-6, 100, 0)
 ops.algorithm('KrylovNewton')
