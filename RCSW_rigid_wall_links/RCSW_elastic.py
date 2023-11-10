@@ -20,6 +20,7 @@ sys.path.append('../')
 
 from helper_functions.create_floor_shell import refine_mesh
 from helper_functions.create_floor_shell import create_shell
+from helper_functions.rcsw_wall_rigid_links import create_wall_rigid_links
 from helper_functions.cqc_modal_combo import modal_combo
 from helper_functions.eigen_analysis import run_eigen_analysis
 from helper_functions.run_mrsa import perform_rcsw_mrsa
@@ -263,7 +264,7 @@ slab_thick = 165 * mm
 fiber_thick = slab_thick / 3
 
 slab_in_plane_modif = 1
-slab_out_plane_modif = 1  # 1/slab_in_plane_modif*10000
+slab_out_plane_modif = 1
 shell_E =  slab_in_plane_modif * 26000 * MPa # Modulus of concrete
 shell_nu = 0.2  # Poisson's ratio
 
@@ -321,13 +322,6 @@ def create_floor(elev, floor_num, floor_label=''):
             else:
                 ops.node(node_num, x_val, unique_ys[jj], elev)
 
-                # Pin gravity columns on upper floors
-                if col_or_wall_node:
-                    elem_type = find_row(lfre_coords_df, [x_val, unique_ys[jj]])  # Get the index/row name
-
-                    if "col" in elem_type:
-                        ops.fix(node_num, 1, 1, 1, 0, 0, 0)
-
             'Store node tags for nodes at the location of columns/walls'
             # Check if the current node is at the location of a wall or column
             if (lfre_coords_df == [x_val, unique_ys[jj]]).all(1).any():
@@ -348,7 +342,7 @@ def create_floor(elev, floor_num, floor_label=''):
 
                         # ==== Load
                         wall_self_weight = conc_rho * np.prod(wall_prop_dict[row_id]) * wall_height  # in kN
-                        # ops.load(node_num, 0, 0, -wall_self_weight, 0, 0, 0)
+                        ops.load(node_num, 0, 0, -wall_self_weight, 0, 0, 0)
 
                         # ==== Mass
                         # First time mass is added, no need to retrieve existing mass
@@ -416,10 +410,10 @@ def create_floor(elev, floor_num, floor_label=''):
         com_y = com_data['yMass_yCoord'].sum() / com_data['yMass'].sum()
 
         # Create COM node
-        ops.node(com_node, com_x, com_y, elev)
+        # ops.node(com_node, com_x, com_y, elev)
 
         # Constraints for Rigid Diaphragm Primary node
-        ops.fix(com_node, 0, 0, 1, 1, 1, 0)  # dx, dy, dz, rx, ry, rz
+        # ops.fix(com_node, 0, 0, 1, 1, 1, 0)  # dx, dy, dz, rx, ry, rz
 
         # =========================================================================
         # Reomove wall nodes, and wall rigid element nodes before applying rigid diaphragm constraint.
@@ -431,7 +425,7 @@ def create_floor(elev, floor_num, floor_label=''):
         # =========================================================================
 
         # # Impose rigid diaphragm constraint
-        ops.rigidDiaphragm(3, com_node, *floor_node_tags)
+        # ops.rigidDiaphragm(3, com_node, *floor_node_tags)
 
         # Add COM node tag of current floor to dictionary
         com_node_tags[floor_num] = com_node
@@ -439,7 +433,7 @@ def create_floor(elev, floor_num, floor_label=''):
         # Create columns & walls
         create_columns(floor_num)
         create_walls(floor_num)
-        create_wall_rigid_links(floor_num)
+        create_wall_rigid_links(ops, floor_num, wall_ends_node_tags, lfre_node_tags, wall_link_prop)
 
     print('Floor ' + floor_num + ' created')
 
@@ -507,100 +501,8 @@ wall_link_I = bm_I
 wall_link_transf_tag_x = 2 # Walls oriented in Global-X direction
 wall_link_transf_tag_y = 3 # Walls oriented in Global-Y direction
 
-
-def create_wall_rigid_links(floor_num):
-
-    wall_rigid_tag = int('5' + floor_num + '01') # 50101
-
-    # Wall 1
-    ops.element('elasticBeamColumn', wall_rigid_tag, wall_ends_node_tags.loc['wall1_l'][floor_num],
-                lfre_node_tags.loc['wall1'][floor_num], wall_link_A, wall_link_E, wall_link_G,
-                wall_link_J, wall_link_I, wall_link_I, wall_link_transf_tag_y)
-
-    ops.element('elasticBeamColumn', wall_rigid_tag + 1, lfre_node_tags.loc['wall1'][floor_num],
-                wall_ends_node_tags.loc['wall1_r'][floor_num], wall_link_A, wall_link_E, wall_link_G,
-                wall_link_J, wall_link_I, wall_link_I, wall_link_transf_tag_y)
-
-    # Wall 2
-    ops.element('elasticBeamColumn', wall_rigid_tag + 2, wall_ends_node_tags.loc['wall2_l'][floor_num],
-                lfre_node_tags.loc['wall2'][floor_num], wall_link_A, wall_link_E, wall_link_G,
-                wall_link_J, wall_link_I, wall_link_I, wall_link_transf_tag_y)
-
-    ops.element('elasticBeamColumn', wall_rigid_tag + 3, lfre_node_tags.loc['wall2'][floor_num],
-                wall_ends_node_tags.loc['wall2_r'][floor_num], wall_link_A, wall_link_E, wall_link_G,
-                wall_link_J, wall_link_I, wall_link_I, wall_link_transf_tag_y)
-
-    # Wall 3
-    ops.element('elasticBeamColumn', wall_rigid_tag + 4, wall_ends_node_tags.loc['wall3_l'][floor_num],
-                lfre_node_tags.loc['wall3'][floor_num], wall_link_A, wall_link_E, wall_link_G,
-                wall_link_J, wall_link_I, wall_link_I, wall_link_transf_tag_x)
-
-    ops.element('elasticBeamColumn', wall_rigid_tag + 5, lfre_node_tags.loc['wall3'][floor_num],
-                wall_ends_node_tags.loc['wall3_r'][floor_num], wall_link_A, wall_link_E, wall_link_G,
-                wall_link_J, wall_link_I, wall_link_I, wall_link_transf_tag_x)
-
-    # Wall 4
-    ops.element('elasticBeamColumn', wall_rigid_tag + 6, wall_ends_node_tags.loc['wall4_l'][floor_num],
-                lfre_node_tags.loc['wall4'][floor_num], wall_link_A, wall_link_E, wall_link_G,
-                wall_link_J, wall_link_I, wall_link_I, wall_link_transf_tag_x)
-
-    ops.element('elasticBeamColumn', wall_rigid_tag + 7, lfre_node_tags.loc['wall4'][floor_num],
-                wall_ends_node_tags.loc['wall4_r'][floor_num], wall_link_A, wall_link_E, wall_link_G,
-                wall_link_J, wall_link_I, wall_link_I, wall_link_transf_tag_x)
-
-    # Wall 5
-    ops.element('elasticBeamColumn', wall_rigid_tag + 8, wall_ends_node_tags.loc['wall5_l'][floor_num],
-                lfre_node_tags.loc['wall5'][floor_num], wall_link_A, wall_link_E, wall_link_G,
-                wall_link_J, wall_link_I, wall_link_I, wall_link_transf_tag_y)
-
-    ops.element('elasticBeamColumn', wall_rigid_tag + 9, lfre_node_tags.loc['wall5'][floor_num],
-                wall_ends_node_tags.loc['wall5_r'][floor_num], wall_link_A, wall_link_E, wall_link_G,
-                wall_link_J, wall_link_I, wall_link_I, wall_link_transf_tag_y)
-
-    # Wall 6
-    ops.element('elasticBeamColumn', wall_rigid_tag + 10, wall_ends_node_tags.loc['wall6_l'][floor_num],
-                lfre_node_tags.loc['wall6'][floor_num], wall_link_A, wall_link_E, wall_link_G,
-                wall_link_J, wall_link_I, wall_link_I, wall_link_transf_tag_y)
-
-    ops.element('elasticBeamColumn', wall_rigid_tag + 11, lfre_node_tags.loc['wall6'][floor_num],
-                wall_ends_node_tags.loc['wall6_r'][floor_num], wall_link_A, wall_link_E, wall_link_G,
-                wall_link_J, wall_link_I, wall_link_I, wall_link_transf_tag_y)
-
-    # Wall 7
-    ops.element('elasticBeamColumn', wall_rigid_tag + 12, wall_ends_node_tags.loc['wall7_l'][floor_num],
-                lfre_node_tags.loc['wall7'][floor_num], wall_link_A, wall_link_E, wall_link_G,
-                wall_link_J, wall_link_I, wall_link_I, wall_link_transf_tag_y)
-
-    ops.element('elasticBeamColumn', wall_rigid_tag + 13, lfre_node_tags.loc['wall7'][floor_num],
-                wall_ends_node_tags.loc['wall7_r'][floor_num], wall_link_A, wall_link_E, wall_link_G,
-                wall_link_J, wall_link_I, wall_link_I, wall_link_transf_tag_y)
-
-    # Wall 8
-    ops.element('elasticBeamColumn', wall_rigid_tag + 14, wall_ends_node_tags.loc['wall8_l'][floor_num],
-                lfre_node_tags.loc['wall8'][floor_num], wall_link_A, wall_link_E, wall_link_G,
-                wall_link_J, wall_link_I, wall_link_I, wall_link_transf_tag_x)
-
-    ops.element('elasticBeamColumn', wall_rigid_tag + 15, lfre_node_tags.loc['wall8'][floor_num],
-                wall_ends_node_tags.loc['wall8_r'][floor_num], wall_link_A, wall_link_E, wall_link_G,
-                wall_link_J, wall_link_I, wall_link_I, wall_link_transf_tag_x)
-
-    # Wall 9
-    ops.element('elasticBeamColumn', wall_rigid_tag + 16, wall_ends_node_tags.loc['wall9_l'][floor_num],
-                lfre_node_tags.loc['wall9'][floor_num], wall_link_A, wall_link_E, wall_link_G,
-                wall_link_J, wall_link_I, wall_link_I, wall_link_transf_tag_x)
-
-    ops.element('elasticBeamColumn', wall_rigid_tag + 17, lfre_node_tags.loc['wall9'][floor_num],
-                wall_ends_node_tags.loc['wall9_r'][floor_num], wall_link_A, wall_link_E, wall_link_G,
-                wall_link_J, wall_link_I, wall_link_I, wall_link_transf_tag_x)
-
-    # Wall 10
-    ops.element('elasticBeamColumn', wall_rigid_tag + 18, wall_ends_node_tags.loc['wall10_l'][floor_num],
-                lfre_node_tags.loc['wall10'][floor_num], wall_link_A, wall_link_E, wall_link_G,
-                wall_link_J, wall_link_I, wall_link_I, wall_link_transf_tag_x)
-
-    ops.element('elasticBeamColumn', wall_rigid_tag + 19, lfre_node_tags.loc['wall10'][floor_num],
-                wall_ends_node_tags.loc['wall10_r'][floor_num], wall_link_A, wall_link_E, wall_link_G,
-                wall_link_J, wall_link_I, wall_link_I, wall_link_transf_tag_x)
+wall_link_prop = [wall_link_A, wall_link_E, wall_link_G, wall_link_J,
+                  wall_link_I, wall_link_transf_tag_x, wall_link_transf_tag_y]
 
 # ============================================================================
 # Create columns
@@ -611,13 +513,12 @@ col_E = steelE
 # The geometric properties of the columns oriented in the East-West direction will be defined using a W14x132 (metric W360x196)
 col_A_EW = 25000 * mm**2
 col_G_EW = col_E / (2*(1 + col_nu))
-col_stiff_modif = 1
+col_stiff_modif = 1e-4
 col_Iy_EW = col_stiff_modif * 228 * 1E6 * mm**4   # weak Iyy
 col_Iz_EW = col_stiff_modif * 637 * 1E6 * mm**4   # strong Ixx
 col_J_EW = col_stiff_modif * 5120 * 1E3 * mm**4
 
 col_transf_tag = 4
-
 
 # The geometric properties of the columns oriented in the North-South direction will be defined using a W14x132 (metric W360x196)
 col_A_NS = 25000 * mm**2
@@ -773,7 +674,7 @@ build_model()
 # Create pvd recorder
 record_direc = './pvd/'
 os.makedirs(record_direc, exist_ok=True)
-ops.recorder('PVD', record_direc, '-precision', 3, '-dT', 1, *['mass', 'eigen', 10])
+ops.recorder('PVD', record_direc, '-precision', 3, '-dT', 1, *['disp', 'reaction', 'mass', 'eigen', 10])
 
 # ============================================================================
 # Eigen Analysis
@@ -791,7 +692,7 @@ grav_direc = './gravity_results/'
 os.makedirs(grav_direc, exist_ok=True)
 
 ops.recorder('Element', '-file', grav_direc + 'colFx.txt', '-ele', 30110, 30111, 30112, '-dof', 1,2, 3, 4, 5, 6, 'globalForce')
-ops.recorder('Node', '-file', grav_direc + 'nodeRxn.txt', '-node', *lfre_node_tags['00'].tolist(), '-dof', 1, 2, 3, 4, 5, 6, 'reaction')
+ops.recorder('Node', '-file', grav_direc + 'nodeRxn.txt', '-node', *lfre_node_tags['00'].tolist(), '-dof', 3, 'reaction')
 
 # Recorders to check correct implementation of boundary condtions for gravity columns
 # ops.recorder('Element', '-file', grav_direc + 'floor01_colResp.txt', '-region', 301, 'force')
@@ -822,7 +723,7 @@ ops.analyze(num_step_sWgt)
 # Shut down gravity recorders
 ops.remove('recorders')
 
-
+"""
 # ============================================================================
 # Modal Response Spectrum Analysis
 # ============================================================================
@@ -863,7 +764,7 @@ mrsa_flr_11_demands = modal_combo(np.loadtxt('./mrsa_results/dirX/floor11_wallRe
 flr_1_Fz = mrsa_flr_1_demands[2::12]
 flr_1_Mx = mrsa_flr_1_demands[3::12]
 
-"""
+
 # ============================================================================
 # Compute Torsional Irregularity Ratio (TIR)
 # ============================================================================

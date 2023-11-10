@@ -118,7 +118,7 @@ def create_shell(floor_num, node_compile, shell_sect_tag, num_y_groups):
 
             shell_nodal_load = area_load * shell_area / 4  # in kN
             shell_nodal_mass = shell_nodal_load / grav_metric # in kN-sec^2/m
-            shell_nodal_load = 0.0
+            # shell_nodal_load = 0.0
 
             ops.element('ShellNLDKGQ', shell_tag, lwr_left_node, lwr_right_node, upr_right_node, upr_left_node, shell_sect_tag)
 
@@ -146,7 +146,7 @@ def create_shell(floor_num, node_compile, shell_sect_tag, num_y_groups):
                 clad_length = abs(llnc_x - lrnc_x)
                 clad_load = clad_udl * clad_length * clad_trib_height[floor_num] / 2
                 clad_mass = clad_load / grav_metric
-                clad_load = 0.0
+                # clad_load = 0.0
 
                 ops.load(lwr_left_node, 0, 0, -clad_load, 0, 0, 0)
                 ops.load(lwr_right_node, 0, 0, -clad_load, 0, 0, 0)
@@ -164,7 +164,7 @@ def create_shell(floor_num, node_compile, shell_sect_tag, num_y_groups):
                 clad_length = abs(lrnc_y - urnc_y)
                 clad_load = clad_udl * clad_length * clad_trib_height[floor_num] / 2
                 clad_mass = clad_load / grav_metric
-                clad_load = 0.0
+                # clad_load = 0.0
 
                 ops.load(lwr_right_node, 0, 0, -clad_load, 0, 0, 0)
                 ops.load(upr_right_node, 0, 0, -clad_load, 0, 0, 0)
@@ -181,7 +181,7 @@ def create_shell(floor_num, node_compile, shell_sect_tag, num_y_groups):
                 clad_length = abs(urnc_x - ulnc_x)
                 clad_load = clad_udl * clad_length * clad_trib_height[floor_num] / 2
                 clad_mass = clad_load / grav_metric
-                clad_load = 0.0
+                # clad_load = 0.0
 
                 ops.load(upr_right_node, 0, 0, -clad_load, 0, 0, 0)
                 ops.load(upr_left_node, 0, 0, -clad_load, 0, 0, 0)
@@ -198,7 +198,7 @@ def create_shell(floor_num, node_compile, shell_sect_tag, num_y_groups):
                 clad_length = abs(ulnc_y - llnc_y)
                 clad_load = clad_udl * clad_length * clad_trib_height[floor_num] / 2
                 clad_mass = clad_load / grav_metric
-                clad_load = 0.0
+                # clad_load = 0.0
 
                 ops.load(upr_left_node, 0, 0, -clad_load, 0, 0, 0)
                 ops.load(lwr_left_node, 0, 0, -clad_load, 0, 0, 0)
@@ -215,7 +215,7 @@ def create_shell(floor_num, node_compile, shell_sect_tag, num_y_groups):
                 clad_length = abs(urnc_x - ulnc_x)
                 clad_load = clad_udl * clad_length * clad_trib_height[floor_num] / 2
                 clad_mass = clad_load / grav_metric
-                clad_load = 0.0
+                # clad_load = 0.0
 
                 ops.load(upr_right_node, 0, 0, -clad_load, 0, 0, 0)
                 ops.load(upr_left_node, 0, 0, -clad_load, 0, 0, 0)
@@ -232,7 +232,7 @@ def create_shell(floor_num, node_compile, shell_sect_tag, num_y_groups):
                 clad_length = abs(ulnc_y - llnc_y)
                 clad_load = clad_udl * clad_length * clad_trib_height[floor_num] / 2
                 clad_mass = clad_load / grav_metric
-                clad_load = 0.0
+                # clad_load = 0.0
 
                 ops.load(upr_left_node, 0, 0, -clad_load, 0, 0, 0)
                 ops.load(lwr_left_node, 0, 0, -clad_load, 0, 0, 0)
