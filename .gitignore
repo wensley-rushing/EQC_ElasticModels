@@ -191,3 +191,10 @@ optimization_results/
 
 #.docx files
 *.docx
+
+# SAP Models folder
+RCSW_SAP_models/
+
+# DXF & PCP files
+*.dxf
+*.pcp

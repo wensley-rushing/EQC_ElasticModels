@@ -42,4 +42,4 @@ def run_eigen_analysis(ops, num_modes, damping_ratio, report_folder, lfre_system
 
     ops.rayleigh(alpha_m, beta_k, beta_k_init, beta_k_comm)
 
-    return angular_freq, modal_prop
+    return angular_freq, periods, modal_prop

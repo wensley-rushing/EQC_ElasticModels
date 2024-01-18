@@ -57,7 +57,7 @@ def get_wall_reinf_ratio(lw, tw, wall_P, wall_M, fpc, fy, steelE):
     wall_reinf_ratio = steel_area_to_spacing_ratio / tw
 
     # Compute minimum reinforcement ratio for longitudinal reinforcement
-    # Values of fpc & fy must be in MPa below. Hence, we need to conver back.
+    # Values of fpc & fy must be in MPa below. Hence, we need to convert back.
     # min_reinf_ratio = np.sqrt(fpc/1000) / (4 * fy / 1000) #  NZS 3101.1.2006: Sect 11.4.4.2
 
     return wall_reinf_ratio

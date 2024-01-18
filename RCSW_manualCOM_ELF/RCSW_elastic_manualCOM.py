@@ -191,14 +191,18 @@ wall_ends_dict = {'wall1_l': [0, 0],
                    'wall10_l': [22.010, 31.025],
                    'wall10_r': [29.410, 31.025]}
 
+# Manually define coordinate of COM node. This will facilitate an ELF in the absence of
+# a RigidDiaphragm constraint
+com_coord_dict = {'com': [16.602, 13.751]}  # In meters
 
 # Convert dictionaries to DataFrame
 lfre_coords_df = pd.DataFrame.from_dict(lfre_coords_dict, orient='index', columns=['x', 'y'])
 wall_ends_df = pd.DataFrame.from_dict(wall_ends_dict, orient='index', columns=['x', 'y'])
+com_coord_df = pd.DataFrame.from_dict(com_coord_dict, orient='index', columns=['x', 'y'])
 
-# Combine coordinates of center-nodes of walls and columns, and end-nodes of walls
+# Combine coordinates of center-nodes of walls, columns, end-nodes of walls, and COM
 # This will be used to define a mesh grid
-lfre_node_positions = pd.concat([lfre_coords_df, wall_ends_df])
+lfre_node_positions = pd.concat([lfre_coords_df, wall_ends_df, com_coord_df])
 
 # Create a dataframe to store node tags nodes at walls/columns location.
 lfre_node_tags = pd.DataFrame(columns=['00', '01', '02', '03', '04', '05',
@@ -271,11 +275,11 @@ slab_out_plane_modif = 0.05
 shell_E =  slab_in_plane_modif * conc_E # Modulus of concrete
 shell_nu = conc_nu  # Poisson's ratio
 
-# ============================================================================
+
 # Initialize dictionary to store node tags of COM for all floors
-# Initialize dictionary to store total mass of each floor
-# ============================================================================
 com_node_tags = {}
+
+# Initialize dictionary to store total mass of each floor
 total_floor_mass = {}
 
 # ============================================================================
@@ -361,21 +365,23 @@ def create_floor(elev, floor_num, floor_label=''):
                 # Assign node tag to `wall_ends_node_tags`
                 wall_ends_node_tags.loc[row_id][floor_num] = node_num
 
+            'Store COM node tag'
+            # Check if the current node is the COM node
+            if floor_num != '00':
+                if (com_coord_df == [x_val, unique_ys[jj]]).all(1).any():
+                    com_node_tags[floor_num] = node_num
+
             # Move to next node
             node_list.append(node_num)
             node_num += 1
 
         node_compile.append(node_list)
 
-    # Store node tag for COM node
-    com_node = node_num # Node tag assigned to center of mass for the current floor.
-
     # Get all node tags in current floor
     floor_node_tags = [node for node_list in node_compile for node in node_list]
 
     # ========================================================================
     # Create floor diaphragm - Loads & mass are assigned here
-    # Compute center of mass
     # Then create columns, walls, and wall rigid links
     # ========================================================================
 
@@ -384,44 +390,12 @@ def create_floor(elev, floor_num, floor_label=''):
         # Create shell - Assign loads & mass
         create_shell(floor_num, node_compile, shell_sect_tag, num_y_groups)
 
-        # Compute center of mass
-        floor_node_x_coord = [ops.nodeCoord(node, 1) for node in floor_node_tags]
-        floor_node_y_coord = [ops.nodeCoord(node, 2) for node in floor_node_tags]
-
+        # Compute total seismic mass of floor
         floor_node_x_mass = [ops.nodeMass(node, 1) for node in floor_node_tags]
         floor_node_y_mass = [ops.nodeMass(node, 2) for node in floor_node_tags]
 
         # Store total floor mass
         total_floor_mass[floor_num] = round(sum(floor_node_x_mass), 3)
-
-        # Initialize DataFrame to store nodal data for COM computation
-        com_data = pd.DataFrame()
-
-        com_data['NodeTags'] = floor_node_tags
-        com_data['xCoord'] = floor_node_x_coord
-        com_data['yCoord'] = floor_node_y_coord
-        com_data['xMass'] = floor_node_x_mass
-        com_data['yMass'] = floor_node_y_mass
-
-        com_data['xMass_xCoord'] = com_data['xMass'] * com_data['xCoord']
-        com_data['yMass_yCoord'] = com_data['yMass'] * com_data['yCoord']
-
-        com_x = com_data['xMass_xCoord'].sum() / com_data['xMass'].sum()
-        com_y = com_data['yMass_yCoord'].sum() / com_data['yMass'].sum()
-
-        # Create COM node
-        # ops.node(com_node, com_x, com_y, elev)
-
-        # Constraints for Rigid Diaphragm Primary node
-        # ops.fix(com_node, 0, 0, 1, 1, 1, 0)  # dx, dy, dz, rx, ry, rz
-
-        # ops.fix(com_node, 0, 0, 1, 1, 1, 0)  # dx, dy, dz, rx, ry, rz
-
-        # Impose rigid diaphragm constraint
-        # ops.rigidDiaphragm(3, com_node, *floor_node_tags)
-
-        # Add COM node tag of current floor to dictionary
-        com_node_tags[floor_num] = com_node
 
         # Create columns & walls
         create_columns(floor_num)
@@ -669,7 +643,7 @@ ops.recorder('Element', '-file', grav_direc + 'WallForces.txt', '-region', 401, 
 ops.recorder('Node', '-file', grav_direc + 'nodeRxn.txt', '-node', *lfre_node_tags['00'].tolist(), '-dof', 3, 'reaction')
 
 num_step_sWgt = 1     # Set weight increments
-ops.constraints('Penalty', 1.0e17, 1.0e17)
+ops.constraints('Plain')
 ops.test('NormDispIncr', 1e-6, 100, 0)
 ops.algorithm('KrylovNewton')
 ops.numberer('RCM')
@@ -685,6 +659,108 @@ ops.remove('recorders')
 # Load reaction forces due to gravity
 grav_rxn_forces = np.loadtxt(grav_direc + 'nodeRxn.txt').T
 
+
+# ELF analysis
+do_ELF_analysis = 1
+elf_base_shear = None
+
+if do_ELF_analysis:
+
+    # Extract eigen vector values for the COM node
+    com_nodes_eigen = list(com_node_tags.values())
+    com_node_eigen_vec = np.zeros(len(com_nodes_eigen))
+
+    for ii in range(len(com_nodes_eigen)):
+        com_node_eigen_vec[ii] = ops.nodeEigenvector(com_nodes_eigen[ii], 1, 1)
+
+    # Normalize mode shapes by the mode shape of the topmost floor
+    com_node_eigen_vec = com_node_eigen_vec / com_node_eigen_vec[-1]
+
+    # Compute sesimic base shear
+    spectral_shape_factor = spectral_shape_fac(periods[0])
+    hazard_factor = 0.13
+    return_per_factor_sls = 0.25
+    return_per_factor_uls = 1.3
+    fault_factor = 1.0
+    perform_factor = 0.7
+    ductility_factor = 1.25  # RCSW
+    story_masses = np.array(list(total_floor_mass.values()))
+    story_weights = story_masses * grav_metric
+    seismic_weight = story_weights.sum()
+
+    elf_base_shear = nz_horiz_seismic_shear(spectral_shape_factor, hazard_factor,
+                                            return_per_factor_sls, return_per_factor_uls,
+                                            fault_factor, perform_factor, ductility_factor,
+                                            seismic_weight)
+
+    # Distribute story forces used Mode 1 eigen shape
+    push_pattern = elf_base_shear * (com_node_eigen_vec * story_masses) / (np.sum(com_node_eigen_vec * story_masses))  # EC8-Part 1 Eqn. 4.10
+
+    'Maintain constant gravity loads and reset time to zero'
+    ops.loadConst('-time', 0.0)
+    ops.wipeAnalysis()
+
+    # Assign lateral loads
+    ts_tag = 11000
+    pattern_tag = 11000
+
+    ops.timeSeries('Constant', ts_tag)
+    ops.pattern('Plain', pattern_tag, ts_tag)
+
+    for jj in range(len(story_heights)):
+        ops.load(com_nodes_eigen[jj], push_pattern[jj], 0., 0., 0., 0., 0.)
+
+    # Create directory to save results
+    elf_res_folder = './ELF_results/'
+    os.makedirs(elf_res_folder, exist_ok=True)
+
+    # Create recorders
+    ops.recorder('Element', '-file', elf_res_folder + 'floor01_colResp.txt',
+                  '-precision', 9, '-region', 301, 'force')
+
+    ops.recorder('Element', '-file', elf_res_folder + 'floor01_wallResp.txt',
+                  '-precision', 9, '-region', 401, 'force')
+
+    ops.recorder('Node', '-file', elf_res_folder + 'baseShear.txt', '-node',
+                  *lfre_node_tags['00'].tolist(), '-dof', 1, 'reaction')  # Fx
+
+    # Perform ELF analysis
+    num_step_sWgt = 1     # Set weight increments
+
+    ops.constraints('Penalty', 1.0e17, 1.0e17)
+    ops.test('NormDispIncr', 1e-6, 100, 0)
+    ops.algorithm('KrylovNewton')
+    ops.numberer('RCM')
+    ops.system('ProfileSPD')
+    ops.integrator('LoadControl', 1, 1, 1, 1)
+    ops.analysis('Static')
+
+    ops.analyze(num_step_sWgt)
+
+    # Shut down recorders
+    ops.remove('recorders')
+
+    print('=============================================================')
+    print('\nELF analysis completed...')
+
+    # Load ELF results
+    elf_wall_demands = np.loadtxt(elf_res_folder + 'floor01_wallResp.txt')
+    elf_col_demands = np.loadtxt(elf_res_folder + 'floor01_colResp.txt')
+
+    elf_col_Fx = elf_col_demands[0::12]
+    elf_col_Fy = elf_col_demands[1::12]
+    elf_col_Fz = elf_col_demands[2::12]
+
+    elf_wall_demands_df = pd.DataFrame({'Fx-kN':elf_wall_demands[0::12],
+                          'Fy-kN':elf_wall_demands[1::12],
+                          'Fz-kN':elf_wall_demands[2::12],
+                          'Mx-kNm':elf_wall_demands[3::12],
+                          'My-kNm':elf_wall_demands[4::12],
+                          'Mz-kNm':elf_wall_demands[5::12]},
+                                       index=['W1', 'W2', 'W3', 'W4', 'W5',
+                                              'W6', 'W7', 'W8', 'W9', 'W10'])
+
+# """
 # ============================================================================
 # Modal Response Spectrum Analysis
 # ============================================================================
@@ -696,11 +772,7 @@ spect_periods = np.loadtxt('../nz_periods.txt')
 
 
 perform_rcsw_mrsa(ops, spect_acc, spect_periods, num_modes, './mrsa_results/dir',
-             wall_ends_node_tags, lfre_node_tags, com_node_tags)
-
-
-# Clear model
-ops.wipe()
+             wall_ends_node_tags, lfre_node_tags)
 
 print('\nMRSA completed.')
 print('======================================================')
@@ -710,6 +782,10 @@ print('======================================================')
 # ============================================================================
 mrsa_base_shearX = modal_combo(np.loadtxt('./mrsa_results/dirX/baseShearX.txt'), angular_freq, damping_ratio, num_modes).sum()
 mrsa_base_shearY = modal_combo(np.loadtxt('./mrsa_results/dirY/baseShearY.txt'), angular_freq, damping_ratio, num_modes).sum()
+
+# Compute factors for scaling MRSA demands to ELF demands
+elf_mrsaX_scale_factor = max(elf_base_shear / mrsa_base_shearX, 1)
+elf_mrsaY_scale_factor = max(elf_base_shear / mrsa_base_shearY, 1)
 
 # Get MRSA demands in walls
 [mrsaX_rcWall_Fx, mrsaX_rcWall_Fy,  mrsaX_rcWall_Fz,
@@ -731,411 +807,7 @@ mrsa_base_shearY = modal_combo(np.loadtxt('./mrsa_results/dirY/baseShearY.txt'),
   mrsaY_wall_links_My,  mrsaY_wall_links_Mz] = get_mrsa_wall_rigid_links_demands(modal_combo, './mrsa_results/dirX/', angular_freq,
                                                                                  damping_ratio, num_modes)
 
+# """
 
-"""
-# ============================================================================
-# Compute Torsional Irregularity Ratio (TIR)
-# ============================================================================
-# Obtain peak total response for corner node displacments
-
-# ===== MRSA - X
-lower_left_corner_dispX = modal_combo(np.loadtxt('./mrsa_results/dirX/lowerLeftCornerDisp.txt'), angular_freq, damping_ratio, num_modes)
-upper_right_corner_dispX = modal_combo(np.loadtxt('./mrsa_results/dirX/upperRightCornerDisp.txt'), angular_freq, damping_ratio, num_modes)
-lower_right_corner_dispX = modal_combo(np.loadtxt('./mrsa_results/dirX/lowerRightCornerDisp.txt'), angular_freq, damping_ratio, num_modes)
-
-tir_x_edgeE = np.maximum(upper_right_corner_dispX, lower_right_corner_dispX) / (0.5*(upper_right_corner_dispX + lower_right_corner_dispX))  # Right edge of building plan
-tir_x_edgeF = np.maximum(lower_left_corner_dispX, lower_right_corner_dispX) / (0.5*(lower_left_corner_dispX + lower_right_corner_dispX))    # Bottom edge of building plan
-
-# ===== MRSA - Y
-lower_left_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/lowerLeftCornerDisp.txt'), angular_freq, damping_ratio, num_modes)
-upper_right_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/upperRightCornerDisp.txt'), angular_freq, damping_ratio, num_modes)
-lower_right_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/lowerRightCornerDisp.txt'), angular_freq, damping_ratio, num_modes)
-
-tir_y_edgeE = np.maximum(upper_right_corner_dispY, lower_right_corner_dispY) / (0.5*(upper_right_corner_dispY + lower_right_corner_dispY))  # Right edge of building plan
-tir_y_edgeF = np.maximum(lower_left_corner_dispY, lower_right_corner_dispY) / (0.5*(lower_left_corner_dispY + lower_right_corner_dispY))    # Bottom edge of building plan
-"""
-
-# ============================================================================
-# Perform ELF
-# ============================================================================
-spectral_shape_factor = spectral_shape_fac(periods[0])
-hazard_factor = 0.13
-return_per_factor_sls = 0.25
-return_per_factor_uls = 1.3
-fault_factor = 1.0
-perform_factor = 0.7
-ductility_factor = 1.25  # RCSW
-story_weights = np.array(list(total_floor_mass.values())) * grav_metric
-seismic_weight = story_weights.sum()
-
-elf_base_shear = nz_horiz_seismic_shear(spectral_shape_factor, hazard_factor,
-                                        return_per_factor_sls, return_per_factor_uls,
-                                        fault_factor, perform_factor, ductility_factor,
-                                        seismic_weight)
-
-elf_force_distrib = nz_horiz_force_distribution(elf_base_shear, story_weights,
-                                                np.cumsum(story_heights))
-
-# Compute factors for scaling MRSA demands to ELF demands
-elf_mrsaX_scale_factor = max(elf_base_shear / mrsa_base_shearX, 1)
-elf_mrsaY_scale_factor = max(elf_base_shear / mrsa_base_shearY, 1)
-
-
-"""
-# ============================================================================
-# Check drift and stability requirements
-# ============================================================================
-
-def check_drift_and_stability(drift_X_dir, drift_Y_dir):
-
-    # CHECK DRIFT REQUIREMENTS
-    max_story_drift = max(drift_X_dir.max(), drift_Y_dir.max())
-    drift_ok = max_story_drift < 2.5  # Maximum story drift limit = 2.5%  NZS 1170.5:2004 - Sect 7.5.1
-
-    print('\nMaximum story drift: {:.2f}%'.format(max_story_drift))
-    if drift_ok:
-        print('Story drift requirements satisfied.')
-    else:
-        print('Story drift requirements NOT satisfied.')
-
-    # CHECK STABILITY REQUIREMENTS (P-DELTA) NZS 1170.5:2004 - Sect 6.5.1
-    thetaX = story_weights * 0.01 * drift_X_dir / (elf_force_distrib * story_heights)
-    thetaY = story_weights * 0.01 * drift_Y_dir / (elf_force_distrib * story_heights)
-
-    max_theta = max(thetaX.max(), thetaY.max())
-    theta_ok = max_theta < 0.3
-
-    print('\nMaximum stability coefficient: {:.2f}'.format(max_theta))
-    if theta_ok:
-        print('Stability requirements satisfied.')
-    else:
-        print('Stability requirements NOT satisfied.')
-
-
-# Load in COM displacements from MRSA
-mrsa_com_dispX = np.loadtxt('./mrsa_results/dirX/COM_dispX.txt')  # For MRSA in x-direction
-mrsa_com_dispY = np.loadtxt('./mrsa_results/dirY/COM_dispY.txt')  # For MRSA in y-direction
-
-# Drift amplification factor
-drift_modif_fac = 1.5  # NZS 1170.5-2004: Table 7.1
-
-# P-Delta Method B: (NZS 1170.5:2004 - Sect. 6.5.4.2 & Commentary Sect. C6.5.4.2)
-# Modal combination on peak COM displacements from MRSA
-mrsa_total_com_dispX = modal_combo(mrsa_com_dispX, angular_freq, damping_ratio, num_modes)
-mrsa_total_com_dispY = modal_combo(mrsa_com_dispY, angular_freq, damping_ratio, num_modes)
-
-# Scale COM displacements by elf-to-mrsa base shear factor # NZS 1170.5-2004: Sect 5.2.2.2b
-mrsa_total_com_dispX *= elf_mrsaX_scale_factor
-mrsa_total_com_dispY *= elf_mrsaY_scale_factor
-
-# Amplify COM displacements by ductility factor
-# NZS 1170.5:2004 Commentary Sect. C6.5.4.2 Step 2
-mrsa_total_com_dispX *= ductility_factor
-mrsa_total_com_dispY *= ductility_factor
-
-# Compute interstory displacements
-inter_story_dispX = np.insert(np.diff(mrsa_total_com_dispX), 0, mrsa_total_com_dispX[0])
-inter_story_dispY = np.insert(np.diff(mrsa_total_com_dispY), 0, mrsa_total_com_dispY[0])
-
-# Compute story shear force due to PDelta actions
-# NZS 1170.5:2004 Commentary Sect. C6.5.4.2 Step 3a
-story_shear_forceX  = story_weights * inter_story_dispX / story_heights
-story_shear_forceY  = story_weights * inter_story_dispY / story_heights
-
-# Compute lateral forces to be used in static analysis for PDelta effects
-# NZS 1170.5:2004 Commentary Sect. C6.5.4.2 Step 3b
-lateral_forces_pDeltaX = np.insert(np.diff(story_shear_forceX), 0, story_shear_forceX[0])
-lateral_forces_pDeltaY = np.insert(np.diff(story_shear_forceY), 0, story_shear_forceY[0])
-
-# ===================================================================================================
-# Perform static analysis for accidental torsional moment & PDelta effects - method B (if applicable)
-# ===================================================================================================
-floor_dimen_x = 29.410 * m
-floor_dimen_y = 31.025 * m
-
-accid_ecc_x = floor_dimen_x / 10
-accid_ecc_y = floor_dimen_y / 10
-
-torsional_mom_x = elf_force_distrib * accid_ecc_y
-torsional_mom_y = elf_force_distrib * accid_ecc_x
-
-# AMPLIFY TORSIONAL MOMENT IF REQUIRED BY CODE
-# New Zealand does not require amplification of accidental torsional moment
-
-torsional_direc = ['X', 'Y']
-elf_dof = [1, 2]
-torsional_sign = [1, -1]
-torsional_folder = ['positive', 'negative']
-
-
-# Perform static analysis for loading in X & Y direction
-for ii in range(len(torsional_direc)):
-
-    # For each direction, account for positive & negative loading
-    for jj in range(len(torsional_sign)):
-        print('\nNow commencing static analysis using torsional moments for '
-              + torsional_folder[jj] + ' ' + torsional_direc[ii] + ' direction.')
-
-        build_model()
-
-        print('\nModel generated...')
-
-        # Impose torsional moments at COMs
-        com_nodes = list(com_node_tags.values())
-
-        # Assign torsional moments
-        ts_tag = 20000
-        pattern_tag = 20000
-
-        ops.timeSeries('Constant', ts_tag)
-        ops.pattern('Plain', pattern_tag, ts_tag)
-
-        # Loop through each COM node and apply torsional moment & PDelta lateral force if applicable
-        for kk in range(len(com_nodes)):
-
-            if torsional_direc[ii] == 'X': # Torsional moment about z-axis & PDelta "Method B" forces are applied
-                ops.load(com_nodes[kk], lateral_forces_pDeltaX[kk], 0., 0., 0., 0., torsional_mom_x[kk] * torsional_sign[jj])
-                # print(lateral_forces_pDeltaX[kk], torsional_mom_x[kk])
-
-            elif torsional_direc[ii] == 'Y':  # Torsional moment about z-axis & PDelta "Method B" forces are applied
-                ops.load(com_nodes[kk], 0., lateral_forces_pDeltaY[kk], 0., 0., 0., torsional_mom_y[kk] * torsional_sign[jj])
-                # print(lateral_forces_pDeltaX[kk], torsional_mom_x[kk])
-
-        # Create directory to save results
-        accident_torsion_res_folder = './accidental_torsion_results/' + torsional_folder[jj] + torsional_direc[ii] + '/'
-        os.makedirs(accident_torsion_res_folder, exist_ok=True)
-
-        # Create recorders for column response in direction of excitation
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor01_colResp.txt',
-                      '-precision', 9, '-region', 301, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor02_colResp.txt',
-                      '-precision', 9, '-region', 302, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor03_colResp.txt',
-                      '-precision', 9, '-region', 303, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor04_colResp.txt',
-                      '-precision', 9, '-region', 304, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor05_colResp.txt',
-                      '-precision', 9, '-region', 305, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor06_colResp.txt',
-                      '-precision', 9, '-region', 306, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor07_colResp.txt',
-                      '-precision', 9, '-region', 307, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor08_colResp.txt',
-                      '-precision', 9, '-region', 308, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor09_colResp.txt',
-                      '-precision', 9, '-region', 309, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor10_colResp.txt',
-                      '-precision', 9, '-region', 310, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor11_colResp.txt',
-                      '-precision', 9, '-region', 311, 'force')
-
-        # Create recorders for wall response in direction of excitation
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor01_wallResp.txt',
-                      '-precision', 9, '-region', 401, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor02_wallResp.txt',
-                      '-precision', 9, '-region', 402, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor03_wallResp.txt',
-                      '-precision', 9, '-region', 403, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor04_wallResp.txt',
-                      '-precision', 9, '-region', 404, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor05_wallResp.txt',
-                      '-precision', 9, '-region', 405, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor06_wallResp.txt',
-                      '-precision', 9, '-region', 406, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor07_wallResp.txt',
-                      '-precision', 9, '-region', 407, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor08_wallResp.txt',
-                      '-precision', 9, '-region', 408, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor09_wallResp.txt',
-                      '-precision', 9, '-region', 409, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor10_wallResp.txt',
-                      '-precision', 9, '-region', 410, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor11_wallResp.txt',
-                      '-precision', 9, '-region', 411, 'force')
-
-        # Recorders for COM displacement
-        ops.recorder('Node', '-file', accident_torsion_res_folder + 'COM_disp' + torsional_direc[ii] + '.txt',
-                      '-node', *list(com_node_tags.values()), '-dof', elf_dof[ii], 'disp')
-
-        # Base shear
-        ops.recorder('Node', '-file', accident_torsion_res_folder + 'baseShear' + torsional_direc[ii] + '.txt', '-node',
-                      *lfre_node_tags['00'].tolist(), '-dof', elf_dof[ii], 'reaction')  # Fx or Fy
-
-        # Perform static analysis
-        num_step_sWgt = 1     # Set weight increments
-
-        ops.constraints('Penalty', 1.0e17, 1.0e17)
-        ops.test('NormDispIncr', 1e-6, 100, 0)
-        ops.algorithm('KrylovNewton')
-        ops.numberer('RCM')
-        ops.system('ProfileSPD')
-        ops.integrator('LoadControl', 1, 1, 1, 1)
-        ops.analysis('Static')
-
-        ops.analyze(num_step_sWgt)
-
-        # Shut down recorders
-        ops.remove('recorders')
-
-        # Clear model
-        ops.wipe()
-
-        print('=============================================================')
-
-print('\nStatic analysis for accidental torsion completed...')
-
-# Process drifts due to PDelta lateral forces
-pdelta_com_disp_posX = np.loadtxt('./accidental_torsion_results/positiveX/COM_dispX.txt')
-pdelta_com_disp_negX = np.loadtxt('./accidental_torsion_results/negativeX/COM_dispX.txt')
-pdelta_com_disp_posY = np.loadtxt('./accidental_torsion_results/positiveY/COM_dispY.txt')
-pdelta_com_disp_negY = np.loadtxt('./accidental_torsion_results/negativeY/COM_dispY.txt')
-
-pdelta_com_dispX = np.maximum(pdelta_com_disp_posX, pdelta_com_disp_negX)
-pdelta_com_dispY = np.maximum(pdelta_com_disp_posY, pdelta_com_disp_negY)
-
-# Determine subsoil factor NZS 1170.5:2004 Sect. C6.5.4.2 Step 4
-# Case study building is in site subclass C.
-if periods[0] < 2.0:
-    subsoil_factor_K = 1.0
-elif 2.0 <= periods[0] <= 4.0:
-    subsoil_factor_K = (6 - periods[0]) / 4
-else:
-    subsoil_factor_K = 4
-
-
-if ductility_factor <= 3.5:
-    subsoil_factor_beta = 2 * ductility_factor * subsoil_factor_K / 3.5
-else:
-    subsoil_factor_beta = 2 * subsoil_factor_K
-
-subsoil_factor_beta = max(subsoil_factor_beta, 1.0)
-
-# When using method B, element demands need to be scaled up by subsoil_factor_beta
-pdelta_fac = subsoil_factor_beta
-
-# Amplify PDelta COM displacements by subsoil_factor_beta and ductility factor
-pdelta_com_dispX *= (subsoil_factor_beta * ductility_factor)
-pdelta_com_dispY *= (subsoil_factor_beta * ductility_factor)
-
-# Add up COM displacements fropm MRSA & PDelta checks
-total_com_dispX = mrsa_total_com_dispX + pdelta_com_dispX
-total_com_dispY = mrsa_total_com_dispY + pdelta_com_dispY
-
-# Compute total interstory displacements
-total_inter_story_dispX = np.insert(np.diff(total_com_dispX), 0, total_com_dispX[0])
-total_inter_story_dispY = np.insert(np.diff(total_com_dispY), 0, total_com_dispY[0])
-
-# Compute story drift ratios
-story_driftX  = total_inter_story_dispX / story_heights * 100
-story_driftY  = total_inter_story_dispY / story_heights * 100
-
-# Amplify story drift ration by drift factor
-story_driftX *= drift_modif_fac
-story_driftY *= drift_modif_fac
-
-check_drift_and_stability(story_driftX, story_driftY)
-
-
-# CHECK STRENGTH REQUIREMENTS
-
-# Save story drifts
-np.savetxt('driftX.txt', story_driftX, fmt='%.2f')
-np.savetxt('driftY.txt', story_driftY, fmt='%.2f')
-
-# ============================================================================
-# Post-process MRSA & accidental torsion results
-# ============================================================================
-col_demands_X = process_beam_col_resp('col', './mrsa_results/dirX/', './accidental_torsion_results/positiveX/',
-                                      './accidental_torsion_results/negativeX/', angular_freq, damping_ratio,
-                                      num_modes, elf_mrsaX_scale_factor, pdelta_fac)
-
-col_demands_Y = process_beam_col_resp('col', './mrsa_results/dirY/', './accidental_torsion_results/positiveY/',
-                                      './accidental_torsion_results/negativeY/', angular_freq, damping_ratio,
-                                      num_modes, elf_mrsaY_scale_factor, pdelta_fac)
-
-wall_demands_X, wall_axialLoad_X, wall_mom_X = process_beam_col_resp('wall', './mrsa_results/dirX/', './accidental_torsion_results/positiveX/',
-                                      './accidental_torsion_results/negativeX/', angular_freq, damping_ratio,
-                                      num_modes, elf_mrsaX_scale_factor, pdelta_fac)
-
-wall_demands_Y, wall_axialLoad_Y, wall_mom_Y = process_beam_col_resp('wall', './mrsa_results/dirY/', './accidental_torsion_results/positiveY/',
-                                      './accidental_torsion_results/negativeY/', angular_freq, damping_ratio,
-                                      num_modes, elf_mrsaY_scale_factor, pdelta_fac)
-
-# Compute wall axial load ratios
-wall_sect_area = wall_prop[:, 0] * wall_prop[:, 1]
-wall_alr_X = (wall_axialLoad_X.divide(wall_sect_area * conc_fcp, axis='columns') * 100).round(2)
-wall_alr_Y = (wall_axialLoad_Y.divide(wall_sect_area * conc_fcp, axis='columns') * 100).round(2)
-
-# Base shear due to static accidental torsion analysis
-accid_torsion_baseShear_pos_X = np.loadtxt('./accidental_torsion_results/positiveX/baseShearX.txt').sum()
-accid_torsion_baseShear_neg_X = np.loadtxt('./accidental_torsion_results/negativeX/baseShearX.txt').sum()
-
-accid_torsion_baseShear_pos_Y = np.loadtxt('./accidental_torsion_results/positiveY/baseShearY.txt').sum()
-accid_torsion_baseShear_neg_Y = np.loadtxt('./accidental_torsion_results/negativeY/baseShearY.txt').sum()
-
-base_shearX = max((mrsa_base_shearX + accid_torsion_baseShear_pos_X), (mrsa_base_shearX + accid_torsion_baseShear_neg_X))
-base_shearY = max((mrsa_base_shearY + accid_torsion_baseShear_pos_Y), (mrsa_base_shearY + accid_torsion_baseShear_neg_Y))
-
-# # Generate story drift plots
-# fig, ax = plt.subplots(1, 2, figsize=(6.0, 7.5), sharex=True, sharey=True, constrained_layout=True)
-# fig.suptitle('Story drift ratios', fontdict=title_font)
-
-# ax[0].vlines(story_driftX[0], 0.0, elev[0])
-# ax[1].vlines(story_driftY[0], 0.0, elev[0])
-
-# for ii in range(1, len(story_driftX)):
-#     ax[0].hlines(elev[ii-1], story_driftX[ii-1], story_driftX[ii])
-#     ax[0].vlines(story_driftX[ii],  elev[ii-1], elev[ii])
-
-#     ax[1].hlines(elev[ii-1], story_driftY[ii-1], story_driftY[ii])  # Correct
-#     ax[1].vlines(story_driftY[ii],  elev[ii-1], elev[ii])
-
-
-# ax[0].set_title('X - Direction', fontsize=12, family='Times New Roman')
-# ax[1].set_title('Y- Direction', fontsize=12, family='Times New Roman')
-
-# ax[0].set_ylabel('Story elevation (m)', fontdict=axes_font)
-
-# for axx in ax.flat:
-#     axx.set_xlim(0.0)
-#     axx.set_ylim(0.0, elev[-1])
-
-#     axx.grid(True, which='major', axis='both', ls='-.', linewidth=0.6)
-
-#     axx.set_yticks(elev)
-
-#     axx.set_xlabel('Story drift ratio (%)', fontdict=axes_font)
-
-#     axx.yaxis.set_major_formatter(StrMethodFormatter('{x:,.1f}'))
-#     axx.tick_params(axis='both', direction='in', colors='grey', labelcolor='grey', zorder=3.0, labelsize=8.0)
-
-# # plt.savefig('DriftPlots.png', dpi=1200)
-
-
-# Compute wall reinforcing ratios
-steel_fy = 500 * MPa
-wall_reinf_ratio = pd.DataFrame(index=wall_mom_X.index, columns=wall_mom_X.columns)
-
-wall_index = 0
-
-for col in wall_mom_X:
-
-    num_floors = wall_mom_X.shape[0]
-    reinf_ratio = np.zeros(num_floors)
-
-    wall_mom = wall_mom_X[col].to_numpy()
-    wall_load = -1.0 * wall_axialLoad_X[col].to_numpy()
-
-    for ii in range(num_floors):
-        reinf_ratio[ii] = get_wall_reinf_ratio(wall_prop[wall_index][0], wall_prop[wall_index][1],
-                              wall_load[ii], wall_mom[ii], conc_fcp, steel_fy, steelE)
-
-    wall_reinf_ratio[col] = reinf_ratio
-    wall_index += 1
-
-wall_Pdel_posX = np.loadtxt('./accidental_torsion_results/positiveX/floor01_wallResp.txt')
-wall_Pdel_posY = np.loadtxt('./accidental_torsion_results/positiveY/floor01_wallResp.txt')
-wall_Pdel_negY = np.loadtxt('./accidental_torsion_results/negativeY/floor01_wallResp.txt')
-wall_Pdel_negX = np.loadtxt('./accidental_torsion_results/negativeX/floor01_wallResp.txt')
-
-"""
+# Clear model
+ops.wipe()

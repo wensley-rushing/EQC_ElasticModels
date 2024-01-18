@@ -9,7 +9,7 @@ import os
 
 
 def perform_rcsw_mrsa(ops, spect_acc, spect_periods, num_modes, results_direc,
-                 wall_ends_node_tags, lfre_node_tags, com_node_tags):
+                  wall_ends_node_tags, lfre_node_tags, com_node_tags=None):
 
     direcs = [1, 2]  # Directions for MRSA
     axis = ['X', 'Y']
@@ -78,9 +78,10 @@ def perform_rcsw_mrsa(ops, spect_acc, spect_periods, num_modes, results_direc,
         ops.recorder('Node', '-file', mrsa_res_folder + 'baseShear' + axis[ii] + '.txt',
                       '-node', *lfre_node_tags['00'].tolist(), '-dof', direcs[ii], 'reaction')
 
-        # # Recorders for COM displacement
-        # ops.recorder('Node', '-file', mrsa_res_folder + 'COM_disp' + axis[ii] + '.txt',
-        #               '-node', *list(com_node_tags.values()), '-dof', direcs[ii], 'disp')
+        if com_node_tags:
+            # Recorders for COM displacement
+            ops.recorder('Node', '-file', mrsa_res_folder + 'COM_disp' + axis[ii] + '.txt',
+                          '-node', *list(com_node_tags.values()), '-dof', direcs[ii], 'disp')
 
         for jj in range(num_modes):
             ops.responseSpectrumAnalysis(direcs[ii], '-Tn', *spect_periods, '-Sa', *spect_acc, '-mode', jj + 1)
