@@ -1,19 +1,20 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu May 25 17:43:33 2023
+Created on Tue Jan 16 13:52:55 2024
 
 @author: Uzo Uwaoma - udu@uw.edu
 """
+
 # Import required modules
 import os
 import sys
 import openseespy.opensees as ops
-import opsvis as opsv
+# import opsvis as opsv
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-from matplotlib.ticker import StrMethodFormatter
+# import matplotlib.pyplot as plt
+# import matplotlib as mpl
+# from matplotlib.ticker import StrMethodFormatter
 
 # Append directory of helper functions to Pyhton Path
 sys.path.append('../')
@@ -34,26 +35,7 @@ from helper_functions.get_dataframe_index import find_row
 # MVLEM specific functions
 from mvlem_helper_functions.run_mrsa import perform_rcsw_mrsa
 from mvlem_helper_functions.rcsw_mrsa_demands import get_mvlem_element_demands, get_mrsa_wall_demands
-
-# Set plotting parameters
-mpl.rcParams['axes.edgecolor'] = 'grey'
-mpl.rcParams['lines.markeredgewidth'] = 0.4
-mpl.rcParams['lines.markeredgecolor'] = 'k'
-plt.rcParams.update({'font.family': 'Times New Roman'})
-
-axes_font = {'family': "sans-serif",
-              'color': 'black',
-              'size': 8
-              }
-
-title_font = {'family': 'sans-serif',
-              'color': 'black',
-              'weight': 'bold',
-              'size': 8}
-
-legend_font = {'family': 'Times New Roman',
-              'size': 8}
-
+from mvlem_helper_functions.mvlem_base_rxn import get_mvlem_base_rxn
 
 # Define Units
 sec = 1
@@ -174,11 +156,20 @@ col_coords_dict = {'col1': [6.505, 0],
                    'col11': [21.210, 23.825],
                    'col12': [29.410, 23.825]}
 
+# Manually define coordinate of COM node. This will facilitate an ELF in the absence of
+# a RigidDiaphragm constraint
+com_coord_dict = {'com': [16.602, 13.751]}  # In meters
+
 # Convert dictionaries to DataFrame
 wall_coords_df = pd.DataFrame.from_dict(wall_coords_dict, orient='index', columns=['x', 'y'])
 col_coords_df = pd.DataFrame.from_dict(col_coords_dict, orient='index', columns=['x', 'y'])
+com_coord_df = pd.DataFrame.from_dict(com_coord_dict, orient='index', columns=['x', 'y'])
 
 wall_col_coords_df = pd.concat([wall_coords_df, col_coords_df])
+
+# Combine coordinates of center-nodes of walls, columns, end-nodes of walls, and COM
+# This will be used to define a mesh grid
+base_node_locations = pd.concat([wall_col_coords_df, com_coord_df])
 
 # Create a dataframe to store node tags nodes at walls/columns location.
 lfre_node_tags = pd.DataFrame(columns=['00', '01', '02', '03', '04', '05',
@@ -187,8 +178,8 @@ lfre_node_tags = pd.DataFrame(columns=['00', '01', '02', '03', '04', '05',
 
 'Sort x and y-coordinates of LFRE. This will be used to define a mesh grid'
 # Extract x & y coordinates, sort and remove dupllicates
-col_wall_x_coords = sorted(list(set([coord for coord in wall_col_coords_df['x']])))
-col_wall_y_coords = sorted(list(set([coord for coord in wall_col_coords_df['y']])))
+col_wall_x_coords = sorted(list(set([coord for coord in base_node_locations['x']])))
+col_wall_y_coords = sorted(list(set([coord for coord in base_node_locations['y']])))
 
 col_wall_x_coords = np.array(list(col_wall_x_coords))
 col_wall_y_coords = np.array(list(col_wall_y_coords))
@@ -243,17 +234,61 @@ slab_out_plane_modif = 0.05
 shell_E =  slab_in_plane_modif * conc_E # Modulus of concrete
 shell_nu = conc_nu  # Poisson's ratio
 
+# ============================================================================
+# Define material properties for columns
+# ============================================================================
+# Only axial stiffness of gravity columns will be captured.
+col_nu = 0.28  # Poisson's ratio for steel
+col_E = steelE
+
+# The geometric properties of the columns oriented in the East-West direction will be defined using a W14x132 (metric W360x196)
+col_A_EW = 25000 * mm**2
+col_G_EW = col_E / (2*(1 + col_nu))
+col_stiff_modif = 1e-6
+col_Iy_EW = col_stiff_modif * 228 * 1E6 * mm**4   # weak Iyy
+col_Iz_EW = col_stiff_modif * 637 * 1E6 * mm**4   # strong Ixx
+col_J_EW = col_stiff_modif * 5120 * 1E3 * mm**4
+
+col_transf_tag = 4
+
+# The geometric properties of the columns oriented in the North-South direction will be defined using a W14x132 (metric W360x196)
+col_A_NS = 25000 * mm**2
+col_G_NS = col_E / (2*(1 + col_nu))
+col_Iy_NS = col_stiff_modif * 637 * 1E6 * mm**4   # strong Ixx
+col_Iz_NS = col_stiff_modif * 228 * 1E6 * mm**4   # weak Iyy
+col_J_NS = col_stiff_modif * 5120 * 1E3 * mm**4
+
+
+# ============================================================================
+# Define material properties for wall
+# ============================================================================
+wall_nu = conc_nu # Poisson's ratio for concrete
+wall_E = conc_E
+wall_G = wall_E / (2*(1 + wall_nu))
+wall_transf_tag = 1  # Walls in EW & NS direction have the same transformation
+
+wall_conc_mat_tag = 90091
+wall_steel_mat_tag = 90092
+
+epsc = 2 * conc_fcp / wall_E
+epscU = 0.004
+
+
 # Initialize dictionary to store node tags of COM for all floors
 com_node_tags = {}
 
 # Initialize dictionary to store total mass of each floor
 total_floor_mass = {}
 
+# Eigen analysis parameters
+num_modes = 10
+damping_ratio = 0.05
+
 # ============================================================================
 # Define function to create a floor
 # ============================================================================
 
-def create_floor(elev, floor_num, floor_label=''):
+def create_floor(elev, floor_num, diaphragm_type=None):
 
     node_compile = []  # Store node tags grouped according to their y-coordinates
 
@@ -324,14 +359,18 @@ def create_floor(elev, floor_num, floor_label=''):
                         neglig_mass = 1E-8 * kN * sec**2 / m
                         ops.mass(node_num, wall_mass, wall_mass, neglig_mass, neglig_mass, neglig_mass, neglig_mass)
 
+            'Store COM node tag'
+            # Check if the current node is the COM node
+            if floor_num != '00':
+                if (com_coord_df == [x_val, unique_ys[jj]]).all(1).any():
+                    com_node = node_num
+                    com_node_tags[floor_num] = com_node
+
             # Move to next node
             node_list.append(node_num)
             node_num += 1
 
         node_compile.append(node_list)
-
-    # Store node tag for COM node
-    com_node = node_num # Node tag assigned to center of mass for the current floor.
 
     # Get all node tags in current floor
     floor_node_tags = [node for node_list in node_compile for node in node_list]
@@ -346,63 +385,33 @@ def create_floor(elev, floor_num, floor_label=''):
         # Create shell - Assign loads & mass
         create_shell(floor_num, node_compile, shell_sect_tag, num_y_groups)
 
-        # Compute center of mass
-        floor_node_x_coord = [ops.nodeCoord(node, 1) for node in floor_node_tags]
-        floor_node_y_coord = [ops.nodeCoord(node, 2) for node in floor_node_tags]
+        if diaphragm_type == 'rigid':
 
+            # Constraints for Rigid Diaphragm Primary node
+            ops.fix(com_node, 0, 0, 1, 1, 1, 0)  # dx, dy, dz, rx, ry, rz
+
+            # Impose rigid diaphragm constraint
+            # First we remove the COM nodetag from the list of floor nodes tags
+            floor_node_tags.remove(com_node)
+
+            ops.rigidDiaphragm(3, com_node, *floor_node_tags)
+
+            # Then it is added back.
+            floor_node_tags.append(com_node)
+
+
+        # Compute total seismic mass of floor
         floor_node_x_mass = [ops.nodeMass(node, 1) for node in floor_node_tags]
-        floor_node_y_mass = [ops.nodeMass(node, 2) for node in floor_node_tags]
+        # floor_node_y_mass = [ops.nodeMass(node, 2) for node in floor_node_tags]
 
         # Store total floor mass
         total_floor_mass[floor_num] = round(sum(floor_node_x_mass), 3)
-
-        # Initialize DataFrame to store nodal data for COM computation
-        com_data = pd.DataFrame()
-
-        com_data['NodeTags'] = floor_node_tags
-        com_data['xCoord'] = floor_node_x_coord
-        com_data['yCoord'] = floor_node_y_coord
-        com_data['xMass'] = floor_node_x_mass
-        com_data['yMass'] = floor_node_y_mass
-
-        com_data['xMass_xCoord'] = com_data['xMass'] * com_data['xCoord']
-        com_data['yMass_yCoord'] = com_data['yMass'] * com_data['yCoord']
-
-        com_x = com_data['xMass_xCoord'].sum() / com_data['xMass'].sum()
-        com_y = com_data['yMass_yCoord'].sum() / com_data['yMass'].sum()
-
-        # Create COM node
-        ops.node(com_node, com_x, com_y, elev)
-
-        # Constraints for Rigid Diaphragm Primary node
-        ops.fix(com_node, 0, 0, 1, 1, 1, 0)  # dx, dy, dz, rx, ry, rz
-
-        # Impose rigid diaphragm constraint
-        ops.rigidDiaphragm(3, com_node, *floor_node_tags)
-
-        # Add COM node tag of current floor to dictionary
-        com_node_tags[floor_num] = com_node
 
         # Create columns & walls
         create_columns(floor_num)
         create_mvlem_walls(floor_num)
 
     print('Floor ' + floor_num + ' created')
-
-
-# ============================================================================
-# Create material properties for wall
-# ============================================================================
-wall_nu = conc_nu # Poisson's ratio for concrete
-wall_E = conc_E
-wall_G = wall_E / (2*(1 + wall_nu))
-wall_transf_tag = 1  # Walls in EW & NS direction have the same transformation
-
-wall_conc_mat_tag = 90091
-wall_steel_mat_tag = 90092
-
-epsc = 2 * conc_fcp / wall_E
-epscU = 0.004
 
 
 def create_mvlem_walls(floor_num):
@@ -420,7 +429,7 @@ def create_mvlem_walls(floor_num):
 
         wall_tr_node = lfre_node_tags.loc[wall_tr_index][floor_num]  # Top-right node of MVLEM element - Node k
         wall_tl_node = lfre_node_tags.loc[wall_tl_index][floor_num]  # Top-left node of MVLEM element - Node l
-        wall_bl_node = wall_tl_node - 10000000 # Bottom-left node of MVLEM element - Node i
+        wall_bl_node = wall_tl_node - 10000000   # Bottom-left node of MVLEM element - Node i
         wall_br_node = wall_tr_node - 10000000   # Bottom-right node of MVLEM element - Node j
 
         wall_nodes = [wall_bl_node, wall_br_node, wall_tr_node, wall_tl_node]
@@ -456,30 +465,6 @@ def create_mvlem_walls(floor_num):
         # Update reference to wall_tag
         wall_tag += 1
 
-
-# ============================================================================
-# Create columns
-# ============================================================================
-# Only axial stiffness of gravity columns will be captured.
-col_nu = 0.28  # Poisson's ratio for steel
-col_E = steelE
-
-# The geometric properties of the columns oriented in the East-West direction will be defined using a W14x132 (metric W360x196)
-col_A_EW = 25000 * mm**2
-col_G_EW = col_E / (2*(1 + col_nu))
-col_stiff_modif = 1e-6
-col_Iy_EW = col_stiff_modif * 228 * 1E6 * mm**4   # weak Iyy
-col_Iz_EW = col_stiff_modif * 637 * 1E6 * mm**4   # strong Ixx
-col_J_EW = col_stiff_modif * 5120 * 1E3 * mm**4
-
-col_transf_tag = 4
-
-# The geometric properties of the columns oriented in the North-South direction will be defined using a W14x132 (metric W360x196)
-col_A_NS = 25000 * mm**2
-col_G_NS = col_E / (2*(1 + col_nu))
-col_Iy_NS = col_stiff_modif * 637 * 1E6 * mm**4   # strong Ixx
-col_Iz_NS = col_stiff_modif * 228 * 1E6 * mm**4   # weak Iyy
-col_J_NS = col_stiff_modif * 5120 * 1E3 * mm**4
 
 
 def create_columns(floor_num):
@@ -526,7 +511,7 @@ def create_columns(floor_num):
 # ============================================================================
 # Model builder
 # ============================================================================
-def build_model():
+def build_model(diaphragm_type):
     # Clear model  memory
     ops.wipe()
 
@@ -552,17 +537,17 @@ def build_model():
     # Create all floors of building
     print('Now creating RCSW model... \n')
     create_floor(ground_flr, '00')
-    create_floor(flr1, '01', '1st')
-    create_floor(flr2, '02', '2nd')
-    create_floor(flr3, '03', '3rd')
-    create_floor(flr4, '04', '4th')
-    create_floor(flr5, '05', '5th')
-    create_floor(flr6, '06', '6th')
-    create_floor(flr7, '07', '7th')
-    create_floor(flr8, '08', '8th')
-    create_floor(flr9, '09', '9th')
-    create_floor(flr10, '10', '10th')
-    create_floor(roof_flr, '11', 'Roof')
+    create_floor(flr1, '01', diaphragm_type)
+    create_floor(flr2, '02', diaphragm_type)
+    create_floor(flr3, '03', diaphragm_type)
+    create_floor(flr4, '04', diaphragm_type)
+    create_floor(flr5, '05', diaphragm_type)
+    create_floor(flr6, '06', diaphragm_type)
+    create_floor(flr7, '07', diaphragm_type)
+    create_floor(flr8, '08', diaphragm_type)
+    create_floor(flr9, '09', diaphragm_type)
+    create_floor(flr10, '10', diaphragm_type)
+    create_floor(roof_flr, '11', diaphragm_type)
 
     # ============================================================================
     # Create regions for steel columns & RC Walls & rigid wall links based on floor
@@ -597,102 +582,51 @@ def build_model():
     create_column_and_wall_regions(ops, col_tags, wall_tags)
 
 
-def extract_nodal_rxn(nodal_reaction):
-    """
-    Helper function to extract & combine nodal reactions at the base.
+def run_eigen_gravity_analysis():
+
+    # Create pvd recorder
+    record_direc = './pvd/'
+    os.makedirs(record_direc, exist_ok=True)
+    ops.recorder('PVD', record_direc, '-precision', 3, '-dT', 1, *['disp', 'reaction', 'mass', 'eigen', 10])
+
+    # ============================================================================
+    # Eigen Analysis
+    # ============================================================================
+    angular_freq, periods, modal_prop = run_eigen_analysis(ops, num_modes, damping_ratio, './', 'RCSW')
 
 
-    Each MVLEM wall has two nodes at its base.
+    # Create recorder
+    grav_direc = './gravity_results/'
+    os.makedirs(grav_direc, exist_ok=True)
+    ops.recorder('Element', '-file', grav_direc + 'colForces.txt', '-precision', 9,
+                 '-region', 301, '-dof', 3, 'globalForce')  # 1st floor columns
 
-    `nodal_reaction` parameter contains the nodal rxns at each of these nodes
-    together with the rxns at the column bases.
+    ops.recorder('Element', '-file', grav_direc + 'WallForces.txt', '-precision', 9,
+                 '-region', 401, 'globalForce')  # 1st floor walls
 
-    There are 10 walls, hence 20 nodes. Therefore the 1st 20
-    values in `nodal_reaction` are the nodal rxns of the walls - this is
-    enforced by how the recorder is set up.
+    ops.recorder('Node', '-file', grav_direc + 'nodeRxn.txt', '-precision', 9, '-node',
+                 *lfre_node_tags['00'].tolist(), '-dof', 3, 'reaction')
 
-    The rxn for each wall is the sum of the rxns at the 2 nodes forming
-    its base.
+    num_step_sWgt = 1     # Set weight increments
+    ops.constraints('Plain')
+    ops.test('NormDispIncr', 1e-6, 100, 0)
+    ops.algorithm('KrylovNewton')
+    ops.numberer('RCM')
+    ops.system('ProfileSPD')
+    ops.integrator('LoadControl', 1, 1, 1, 1)
+    ops.analysis('Static')
 
-    Therefore, extract the sum of base reactions for each wall
-    then create a new array of base reactions for walls & columns.
+    ops.analyze(num_step_sWgt)
 
-    Parameters
-    ----------
-    nodal_reaction : numpy.array
-        Array of nodal reactionss.
+    # Shut down gravity recorders
+    ops.remove('recorders')
 
-    """
-
-    wall_rxn = nodal_reaction[0:20:2] + nodal_reaction[1:20:2]
-    combined_nodal_rxn = np.hstack((wall_rxn, nodal_reaction[20:]))
-
-    return combined_nodal_rxn
+    return angular_freq, periods, modal_prop
 
 
-# Generate model
-build_model()
-opsv.plot_model(node_labels=0, element_labels=0)
-
-# Create pvd recorder
-record_direc = './pvd/'
-os.makedirs(record_direc, exist_ok=True)
-ops.recorder('PVD', record_direc, '-precision', 3, '-dT', 1, *['disp', 'reaction', 'mass', 'eigen', 10])
-
-# ============================================================================
-# Eigen Analysis
-# ============================================================================
-num_modes = 10
-damping_ratio = 0.05
-
-angular_freq, periods, modal_prop = run_eigen_analysis(ops, num_modes, damping_ratio, './', 'RCSW')
-
-# ============================================================================
-# Gravity analysis
-# ============================================================================
-# Create recorder
-grav_direc = './gravity_results/'
-os.makedirs(grav_direc, exist_ok=True)
-ops.recorder('Element', '-file', grav_direc + 'colForces.txt', '-precision', 9,
-              '-region', 301, '-dof', 3, 'globalForce')  # 1st floor columns
-
-ops.recorder('Element', '-file', grav_direc + 'WallForces.txt', '-precision', 9,
-              '-region', 401, 'globalForce')  # 1st floor walls
-
-ops.recorder('Node', '-file', grav_direc + 'nodeRxn.txt', '-precision', 9, '-node',
-              *lfre_node_tags['00'].tolist(), '-dof', 3, 'reaction')
-
-num_step_sWgt = 1     # Set weight increments
-ops.constraints('Transformation')
-ops.test('NormDispIncr', 1e-6, 100, 0)
-ops.algorithm('KrylovNewton')
-ops.numberer('RCM')
-ops.system('ProfileSPD')
-ops.integrator('LoadControl', 1, 1, 1, 1)
-ops.analysis('Static')
-
-ops.analyze(num_step_sWgt)
-
-# Shut down gravity recorders
-ops.remove('recorders')
-
-# Load reaction forces due to gravity
-grav_nodal_rxn = np.loadtxt(grav_direc + 'nodeRxn.txt').T
-grav_col_forces = np.loadtxt(grav_direc + 'colForces.txt').T
-grav_wall_nodal_forces = np.loadtxt(grav_direc + 'WallForces.txt').T
-
-# Convert nodal rxns to dataframe
-grav_nodal_rxn_combined = pd.DataFrame(extract_nodal_rxn(grav_nodal_rxn), columns=['Fz (kN)'],
-                                  index=list(wall_prop_df.index) + list(col_coords_df.index))
-
-# Extract axial forces from element demands.
-'These values should equal `grav_nodal_wall_rxn`'
-(_, _, grav_wall_elem_Fz, _, _, _) = get_mvlem_element_demands(grav_wall_nodal_forces)
 
 # ELF analysis
-do_ELF_analysis = 1
-
-if do_ELF_analysis:
+def run_elf_analysis(periods):
 
     # Extract eigen vector values for the COM node
     com_nodes_eigen = list(com_node_tags.values())
@@ -747,7 +681,7 @@ if do_ELF_analysis:
 
     # Create recorders
     ops.recorder('Element', '-file', elf_res_folder + 'floor01_colResp.txt',
-                  '-precision', 9, '-region', 301, '-dof', 3, 'force')
+                  '-precision', 9, '-region', 301, 'force')
 
     ops.recorder('Element', '-file', elf_res_folder + 'floor01_wallResp.txt',
                   '-precision', 9, '-region', 401, 'globalForce')
@@ -785,7 +719,7 @@ if do_ELF_analysis:
     elf_nodal_rxn_Fz = np.loadtxt(elf_res_folder + 'baseRxn.txt')
 
     # Process nodal rxns.
-    elf_nodal_rxn_combined = pd.DataFrame(extract_nodal_rxn(elf_nodal_rxn_Fz), columns=['Fz (kN)'],
+    elf_nodal_rxn_combined = pd.DataFrame(get_mvlem_base_rxn(elf_nodal_rxn_Fz), columns=['Fz (kN)'],
                                      index=list(wall_prop_df.index) + list(col_coords_df.index))
 
     # Process ELF demands in gravity columns
@@ -806,6 +740,10 @@ if do_ELF_analysis:
     elf_col_Fy = elf_col_demands[1::12]
     elf_col_Fz = elf_col_demands[2::12]
 
+    elf_col_demands_df = pd.DataFrame({'Fx-kN': elf_col_Fx,
+                                       'Fy-kN': elf_col_Fy,
+                                       'Fz-kN': elf_col_Fz}, index=col_coords_df.index)
+
     # Process ELF demands in walls
     (elf_wall_elem_Fx, elf_wall_elem_Fy, elf_wall_elem_Fz,
      elf_wall_elem_Mx, elf_wall_elem_My, elf_wall_elem_Mz) = get_mvlem_element_demands(elf_wall_demands)
@@ -817,47 +755,45 @@ if do_ELF_analysis:
                           'My-kNm': elf_wall_elem_My,
                           'Mz-kNm': elf_wall_elem_Mz}, index=wall_prop_df.index)
 
-
-# ============================================================================
-# Modal Response Spectrum Analysis
-# ============================================================================
-
-# Load spectral accelerations and periods for response spectrum
-# Using Wellington's Hazard
-spect_acc = np.loadtxt('../../nz_spectral_acc.txt')
-spect_periods = np.loadtxt('../../nz_periods.txt')
-
-perform_rcsw_mrsa(ops, spect_acc, spect_periods, num_modes, './mrsa_results/dir', lfre_node_tags)
-
-print('\nMRSA completed.')
-print('======================================================')
-
-# ============================================================================
-# Post-process MRSA results
-# ============================================================================
-mrsa_base_shearX = modal_combo(np.loadtxt('./mrsa_results/dirX/baseShearX.txt'), angular_freq, damping_ratio, num_modes).sum()
-mrsa_base_shearY = modal_combo(np.loadtxt('./mrsa_results/dirY/baseShearY.txt'), angular_freq, damping_ratio, num_modes).sum()
-
-# Compute factors for scaling MRSA demands to ELF demands
-elf_mrsaX_scale_factor = max(elf_base_shear / mrsa_base_shearX, 1)
-elf_mrsaY_scale_factor = max(elf_base_shear / mrsa_base_shearY, 1)
+    return elf_base_shear, elf_nodal_rxn_combined, elf_col_demands_df, elf_wall_demands_df
 
 
+# MRSA
+def run_mrsa(angular_freq, elf_base_shear):
 
-# Get MRSA demands in walls
-[mrsaX_rcWall_Fx, mrsaX_rcWall_Fy,  mrsaX_rcWall_Fz,
-  mrsaX_rcWall_Mx,  mrsaX_rcWall_My,  mrsaX_rcWall_Mz] =  get_mrsa_wall_demands(modal_combo, './mrsa_results/dirX/', angular_freq,
-                                                                           damping_ratio, num_modes)
+    # Load spectral accelerations and periods for response spectrum
+    # Using Wellington's Hazard
+    spect_acc = np.loadtxt('../../nz_spectral_acc.txt')
+    spect_periods = np.loadtxt('../../nz_periods.txt')
 
-[mrsaY_rcWall_Fx, mrsaY_rcWall_Fy,  mrsaY_rcWall_Fz,
-  mrsaY_rcWall_Mx,  mrsaY_rcWall_My,  mrsaY_rcWall_Mz] =  get_mrsa_wall_demands(modal_combo, './mrsa_results/dirY/', angular_freq,
-                                                                          damping_ratio, num_modes)
+    perform_rcsw_mrsa(ops, spect_acc, spect_periods, num_modes, './mrsa_results/dir', lfre_node_tags)
 
-# """
+    print('\nMRSA completed.')
+    print('======================================================')
 
-# Clear model
-ops.wipe()
+    # ============================================================================
+    # Post-process MRSA results
+    # ============================================================================
+    mrsa_base_shearX = modal_combo(np.loadtxt('./mrsa_results/dirX/baseShearX.txt'), angular_freq, damping_ratio, num_modes).sum()
+    mrsa_base_shearY = modal_combo(np.loadtxt('./mrsa_results/dirY/baseShearY.txt'), angular_freq, damping_ratio, num_modes).sum()
 
+    # Compute factors for scaling MRSA demands to ELF demands
+    elf_mrsaX_scale_factor = max(elf_base_shear / mrsa_base_shearX, 1)
+    elf_mrsaY_scale_factor = max(elf_base_shear / mrsa_base_shearY, 1)
+
+
+    # Get MRSA demands in walls
+    [mrsaX_rcWall_Fx, mrsaX_rcWall_Fy,  mrsaX_rcWall_Fz,
+      mrsaX_rcWall_Mx,  mrsaX_rcWall_My,  mrsaX_rcWall_Mz] =  get_mrsa_wall_demands(modal_combo, './mrsa_results/dirX/', angular_freq,
+                                                                               damping_ratio, num_modes)
+
+    [mrsaY_rcWall_Fx, mrsaY_rcWall_Fy,  mrsaY_rcWall_Fz,
+      mrsaY_rcWall_Mx,  mrsaY_rcWall_My,  mrsaY_rcWall_Mz] =  get_mrsa_wall_demands(modal_combo, './mrsa_results/dirY/', angular_freq,
+                                                                              damping_ratio, num_modes)
+
+    return (mrsa_base_shearX, mrsa_base_shearY, elf_mrsaX_scale_factor, elf_mrsaY_scale_factor,
+            mrsaX_rcWall_Fx, mrsaX_rcWall_Fy,  mrsaX_rcWall_Fz, mrsaX_rcWall_Mx,  mrsaX_rcWall_My,  mrsaX_rcWall_Mz,
+            mrsaY_rcWall_Fx, mrsaY_rcWall_Fy,  mrsaY_rcWall_Fz, mrsaY_rcWall_Mx,  mrsaY_rcWall_My,  mrsaY_rcWall_Mz)
 
 # wall_coords_ijkl_df = pd.DataFrame.from_dict(
 #                         {'wall1_tr': [0, 0], 'wall1_tl': [0, 7.550], 'wall1_bl': [0, 7.550], 'wall1_br': [0, 0],
@@ -871,4 +807,3 @@ ops.wipe()
 #                         'wall9_tr': [20.410, 31.025], 'wall9_tl': [13.010, 31.025], 'wall9_bl': [13.010, 31.025], 'wall9_br': [20.410, 31.025],
 #                         'wall10_tr': [29.410, 31.025], 'wall10_tl': [22.010, 31.025], 'wall10_bl': [22.010, 31.025], 'wall10_br': [29.410, 31.025]},
 #                     orient='index', columns=['x', 'y'])
-
