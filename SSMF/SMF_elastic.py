@@ -202,6 +202,7 @@ shell_nu = 0.2  # Poisson's ratio
 # Define generic steel properties
 # ============================================================================
 steel_E = 210 * GPa
+steel_Fy = 300 * MPa  # Using AS/NZS 3679.1-300 SO (SEISMIC) steel
 
 # ============================================================================
 # Define rigid material for beam-column joints elements in panel zone region
@@ -224,8 +225,8 @@ bm_transf_tag_y = 4  # Beams oriented in Global-Y direction
 bm_mom_inertia_strong = np.array(list(nzs_beams['Ix']))
 
 # The geometric properties of the beams will be defined relative to the stiffness of the first floor beam
-base_Ix = 9752.529562607646  # No need to multiply by 'mm' or '1E6' 10367.365120546241
-slope_Ix_line = 1/31  # 0.0035511206867118853
+base_Ix = 3969.261981783726 # No need to multiply by 'mm' or '1E6' 10367.365120546241
+slope_Ix_line = 0.01701408520797944  # 0.0035511206867118853
 col_group_heights = np.array([0, 6.2, 15.5, 24.8, 31])  # Height of column groups from the 1st floor
 
 # Assume linear relationship
@@ -265,9 +266,11 @@ col_designation = col_sect_flr_1.name
 
 desig = ''
 for char in col_designation:
-    desig += char
     if char == 'B' or char == 'C':
         break
+    else:
+        desig += char
+
 
 col_sect_flr_2_to_4 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= col_beam_mom_ratio * bm_sect_flr_2_to_4['Zx']].tolist()[-1]]
 col_sect_flr_5_to_7 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= col_beam_mom_ratio * bm_sect_flr_5_to_7['Zx']].tolist()[-1]]
@@ -609,7 +612,7 @@ ops.analyze(num_step_sWgt)
 # Shut down gravity recorders
 ops.remove('recorders')
 
-
+# """
 # ============================================================================
 # Modal Response Spectrum Analysis
 # ============================================================================
@@ -748,7 +751,7 @@ def check_drift_and_stability(drift_X_dir, drift_Y_dir):
     max_story_drift = max(drift_X_dir.max(), drift_Y_dir.max())
     drift_ok = max_story_drift < 2.5  # Maximum story drift limit = 2.5%  NZS 1170.5:2004 - Sect 7.5.1
 
-    print('\nMaximum story drift: {:.2f}%'.format(max_story_drift))
+    print('\nMaximum story drift: {:.3f}%'.format(max_story_drift))
     if drift_ok:
         print('Story drift requirements satisfied.')
     else:
@@ -761,7 +764,7 @@ def check_drift_and_stability(drift_X_dir, drift_Y_dir):
     max_theta = max(thetaX.max(), thetaY.max())
     theta_ok = max_theta < 0.3
 
-    print('\nMaximum stability coefficient: {:.2f}'.format(max_theta))
+    print('\nMaximum stability coefficient: {:.3f}'.format(max_theta))
     if theta_ok:
         print('Stability requirements satisfied.')
     else:
@@ -775,7 +778,7 @@ mrsa_com_dispY = np.loadtxt('./mrsa_results/dirY/COM_dispY.txt')  # For MRSA in 
 # Drift amplification factor
 drift_modif_fac = 1.5  # NZS 1170.5-2004: Table 7.1
 
-pdelta_method = "B"
+pdelta_method = "A"
 
 if pdelta_method == "A":  # (NZS 1170.5:2004 - Sect. 6.5.4.1)
 
@@ -829,7 +832,8 @@ else: # Method B (NZS 1170.5:2004 - Sect. 6.5.4.2 & Commentary Sect. C6.5.4.2)
 
 
 # ===================================================================================================
-# Perform static analysis for accidental torsional moment & PDelta effects - method B (if applicable)
+# Perform static analysis for accidental torsional moment (PDelta method A & B)
+# & for PDelta effects (PDelta method B)
 # ===================================================================================================
 floor_dimen_x = 29.410 * m
 floor_dimen_y = 31.025 * m
@@ -848,13 +852,13 @@ elf_dof = [1, 2]
 torsional_sign = [1, -1]
 torsional_folder = ['positive', 'negative']
 
-
 # Perform static analysis for loading in X & Y direction
 for ii in range(len(torsional_direc)):
 
     # For each direction, account for positive & negative loading
     for jj in range(len(torsional_sign)):
-        print('\nNow commencing static analysis using torsional moments for ' + torsional_folder[jj] + ' ' + torsional_direc[ii] + ' direction.')
+        print('\nNow commencing static analysis using torsional moments for '
+              + torsional_folder[jj] + ' ' + torsional_direc[ii] + ' direction.')
         build_model()
 
         print('\nModel generated...')
@@ -1000,8 +1004,6 @@ if pdelta_method == "B":
 print('\nBeam sections: ', bm_sections)
 print('\nColumn sections: ', col_sections)
 
-# CHECK STRENGTH REQUIREMENTS
-
 # Save story drifts
 np.savetxt('driftX-PDeltaMethod{}.txt'.format(pdelta_method), story_driftX, fmt='%.2f')
 np.savetxt('driftY-PDeltaMethod{}.txt'.format(pdelta_method), story_driftY, fmt='%.2f')
@@ -1024,6 +1026,39 @@ col_demands_X = process_beam_col_resp('col', './mrsa_results/dirX/', './accident
 col_demands_Y = process_beam_col_resp('col', './mrsa_results/dirY/', './accidental_torsion_results/positiveY/',
                                       './accidental_torsion_results/negativeY/', angular_freq, damping_ratio, num_modes,
                                       elf_mrsaY_scale_factor, pdelta_fac)
+
+# CHECK STRENGTH REQUIREMENTS
+# Create array of design flexural strengths for beam sections per floor
+bm_nominal_strengths = 0.9 * steel_Fy * np.array([
+                                                nzs_beams.loc[bm_sections[0]]['Zx'],
+                                                nzs_beams.loc[bm_sections[1]]['Zx'],
+                                                nzs_beams.loc[bm_sections[1]]['Zx'],
+                                                nzs_beams.loc[bm_sections[1]]['Zx'],
+                                                nzs_beams.loc[bm_sections[2]]['Zx'],
+                                                nzs_beams.loc[bm_sections[2]]['Zx'],
+                                                nzs_beams.loc[bm_sections[2]]['Zx'],
+                                                nzs_beams.loc[bm_sections[3]]['Zx'],
+                                                nzs_beams.loc[bm_sections[3]]['Zx'],
+                                                nzs_beams.loc[bm_sections[3]]['Zx'],
+                                                nzs_beams.loc[bm_sections[4]]['Zx']]) * 1E3 * mm**3  # result in kN-m
+
+# Initialize DataFrame to save flexural demand & design strengths.
+bm_flexural_design = pd.DataFrame(columns=['Floor', 'Phi-Mn (kN-m)', 'Mu (kN-m)', 'Satisfactory'], index=beam_demands_X.index)
+bm_flexural_design['Floor'] = beam_demands_X['Floor']
+bm_flexural_design['Phi-Mn (kN-m)'] = bm_nominal_strengths
+bm_flexural_design['Mu (kN-m)'] = pd.concat([
+                                            beam_demands_X[['Mx (kN-m)','My (kN-m)']],
+                                            beam_demands_Y[['Mx (kN-m)','My (kN-m)']]], axis=1).max(axis=1)
+
+bm_flexural_design['Satisfactory'] = bm_flexural_design['Phi-Mn (kN-m)'] >= bm_flexural_design['Mu (kN-m)']
+
+# Verify that the design flexural strength of beams on all floors >= flexural demand
+bm_flexural_satisfied = (bm_flexural_design['Satisfactory'] == True).all()
+
+if bm_flexural_satisfied:
+    print('Beam flexural requirements is satisfied!.')
+else:
+    print('Beam flexural requirements is NOT satisfied!.')
 
 # Base shear due to static accidental torsion analysis
 accid_torsion_baseShear_pos_X = np.loadtxt('./accidental_torsion_results/positiveX/baseShearX.txt').sum()
@@ -1069,3 +1104,4 @@ for axx in ax.flat:
     axx.tick_params(axis='both', direction='in', colors='grey', labelcolor='grey', zorder=3.0, labelsize=8.0)
 
 # plt.savefig('DriftPlots-PDeltaMethod{}.png'.format(pdelta_method), dpi=1200)
+# """

@@ -22,7 +22,7 @@ from helper_functions.build_smf_column import create_columns
 from helper_functions.build_smf_beam import create_beams
 from helper_functions.cqc_modal_combo import modal_combo
 from helper_functions.get_story_drift import compute_story_drifts
-from helper_functions.elf_new_zealand import nz_horiz_seismic_shear
+from helper_functions.elf_new_zealand import nz_horiz_seismic_shear, nz_horiz_force_distribution
 from helper_functions.get_spectral_shape_factor import spectral_shape_fac
 
 
@@ -213,6 +213,7 @@ col_transf_tag_NS = 2
 com_node_tags = {}
 total_floor_mass = {}
 
+
 # ============================================================================
 # Define function to create a floor
 # ============================================================================
@@ -330,155 +331,14 @@ def create_floor(elev, floor_num, beam_prop=None, col_prop=None, floor_label='',
 
     # print('Floor ' + floor_num + ' created')
 
+pdelta_method = "A"  # A or B
+
 # ============================================================================
 # Model builder
 # ============================================================================
+def objective_func(optim_params):
 
-
-def build_model(optim_params):
-
-    print(optim_params)
-
-    # The geometric properties of the beams will be defined relative to the stiffness of the first floor beam
-    base_Ix = optim_params[0]  # No need to multiply by 'mm' or '1E6'
-    slope_Ix_line = optim_params[1]
-
-    col_group_heights = np.array([0, 6.2, 15.5, 24.8, 31])  # Height of column groups from the 1st floor
-
-    # Assume linear relationship
-    beam_Ix_distrib = 1 - slope_Ix_line*col_group_heights
-
-    # ============================================================================
-    # Define beam section properties
-    # ============================================================================
-    bm_sect_flr_1 = nzs_beams.loc[nzs_beams.index[nzs_beams['Ix'] >= beam_Ix_distrib[0] * base_Ix].tolist()[-1]]
-    bm_sect_flr_2_to_4 = nzs_beams.loc[nzs_beams.index[nzs_beams['Ix'] >= beam_Ix_distrib[1] * base_Ix].tolist()[-1]]
-    bm_sect_flr_5_to_7 = nzs_beams.loc[nzs_beams.index[nzs_beams['Ix'] >= beam_Ix_distrib[2] * base_Ix].tolist()[-1]]
-    bm_sect_flr_8_to_10 = nzs_beams.loc[nzs_beams.index[nzs_beams['Ix'] >= beam_Ix_distrib[3] * base_Ix].tolist()[-1]]
-    bm_sect_flr_11 = nzs_beams.loc[nzs_beams.index[nzs_beams['Ix'] >= beam_Ix_distrib[4] * base_Ix].tolist()[-1]]
-
-
-    bm_sections = [bm_sect_flr_1.name, bm_sect_flr_2_to_4.name, bm_sect_flr_5_to_7.name, bm_sect_flr_8_to_10.name, bm_sect_flr_11.name]
-    print('Beam sections: ', bm_sections)
-
-    bm_prop_flr_1 = [bm_sect_flr_1, bm_E, bm_G, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
-    bm_prop_flr_2_to_4 = [bm_sect_flr_2_to_4, bm_E, bm_G, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
-    bm_prop_flr_5_to_7 = [bm_sect_flr_5_to_7, bm_E, bm_G, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
-    bm_prop_flr_8_to_10 = [bm_sect_flr_8_to_10, bm_E, bm_G, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
-    bm_prop_flr_11 = [bm_sect_flr_11, bm_E, bm_G, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
-
-
-    # ============================================================================
-    # Define column section properties
-    # ============================================================================
-    col_beam_mom_ratio = 1.25  # Overstrength factor per NZS 3404.1:1997 - Table 12.2.8(1)
-
-    col_sect_flr_1 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= col_beam_mom_ratio * bm_sect_flr_1['Zx']].tolist()[-1]]
-    col_sect_flr_2_to_4 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= col_beam_mom_ratio * bm_sect_flr_2_to_4['Zx']].tolist()[-1]]
-    col_sect_flr_5_to_7 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= col_beam_mom_ratio * bm_sect_flr_5_to_7['Zx']].tolist()[-1]]
-    col_sect_flr_8_to_10 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= col_beam_mom_ratio * bm_sect_flr_8_to_10['Zx']].tolist()[-1]]
-    col_sect_flr_11 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= col_beam_mom_ratio * bm_sect_flr_11['Zx']].tolist()[-1]]
-
-    col_sections = [col_sect_flr_1.name, col_sect_flr_2_to_4.name, col_sect_flr_5_to_7.name, col_sect_flr_8_to_10.name, col_sect_flr_11.name]
-    print('Column sections: ', col_sections)
-
-    col_prop_flr_1 = [col_sect_flr_1, col_E, col_G, col_transf_tag_EW, col_transf_tag_NS, pzone_transf_tag_col]
-    col_prop_flr_2_to_4 = [col_sect_flr_2_to_4, col_E, col_G, col_transf_tag_EW, col_transf_tag_NS, pzone_transf_tag_col]
-    col_prop_5_to_7 = [col_sect_flr_5_to_7, col_E, col_G, col_transf_tag_EW, col_transf_tag_NS, pzone_transf_tag_col]
-    col_prop_8_to_10 = [col_sect_flr_8_to_10, col_E, col_G, col_transf_tag_EW, col_transf_tag_NS, pzone_transf_tag_col]
-    col_prop_flr_11 = [col_sect_flr_11, col_E, col_G, col_transf_tag_EW, col_transf_tag_NS, pzone_transf_tag_col]
-
-
-    # Clear model
-    # ops.wipe()
-
-    # Model Builder
-    ops.model('basic', '-ndm', 3, '-ndf', 6)
-
-    # Create shell material for floor diaphragm
-    ops.nDMaterial('ElasticIsotropic', nD_mattag, shell_E, shell_nu)
-    ops.nDMaterial('PlateFiber', plate_fiber_tag, nD_mattag)
-    ops.section('LayeredShell', shell_sect_tag, 3, plate_fiber_tag, fiber_thick, plate_fiber_tag, fiber_thick, plate_fiber_tag, fiber_thick)
-
-    # Define geometric transformation for beams
-    ops.geomTransf('PDelta', bm_transf_tag_x, 0, -1, 0)
-    ops.geomTransf('PDelta', bm_transf_tag_y, 1, 0, 0)  # -1, 0, 0
-
-    # Define geometric transformation for columns
-    ops.geomTransf('PDelta', col_transf_tag_EW, 0, 1, 0)
-    ops.geomTransf('PDelta', col_transf_tag_NS, 0, 1, 0)
-
-    # Define geometric transformation for rigid panel zone elements
-    ops.geomTransf('Linear', pzone_transf_tag_col, 0, 1, 0)
-    ops.geomTransf('Linear', pzone_transf_tag_bm_x, 0, -1, 0)
-    ops.geomTransf('Linear', pzone_transf_tag_bm_y, 1, 0, 0)
-
-    # Create all floors of building
-    # print('Now creating SSMF model... \n')
-
-    create_floor(ground_flr, '00')
-    create_floor(flr1, '01', bm_prop_flr_1, col_prop_flr_1, '1st')
-    create_floor(flr2, '02', bm_prop_flr_2_to_4, col_prop_flr_2_to_4, '2nd')
-    create_floor(flr3, '03', bm_prop_flr_2_to_4, col_prop_flr_2_to_4, '3rd')
-    create_floor(flr4, '04', bm_prop_flr_2_to_4, col_prop_flr_2_to_4, '4th')
-    create_floor(flr5, '05', bm_prop_flr_5_to_7, col_prop_5_to_7, '5th')
-    create_floor(flr6, '06', bm_prop_flr_5_to_7, col_prop_5_to_7, '6th')
-    create_floor(flr7, '07', bm_prop_flr_5_to_7, col_prop_5_to_7, '7th')
-    create_floor(flr8, '08', bm_prop_flr_8_to_10, col_prop_8_to_10, '8th')
-    create_floor(flr9, '09', bm_prop_flr_8_to_10, col_prop_8_to_10, '9th')
-    create_floor(flr10, '10', bm_prop_flr_8_to_10, col_prop_8_to_10, '10th')
-    create_floor(roof_flr, '11', bm_prop_flr_11, col_prop_flr_11, 'Roof')
-
-    # ============================================================================
-    # Create regions for SMF beams based on floor
-    # ============================================================================
-    # Get all element tags
-    elem_tags = ops.getEleTags()
-
-    floor_nums = ['01', '02', '03', '04', '05', '06',
-                  '07', '08', '09', '10', '11']
-
-    beam_tags = []
-
-    for floor in floor_nums:
-        floor_bm_tags = []
-
-        for tag in elem_tags:
-
-            # Only select beam elements
-            if str(tag).startswith('2' + floor):
-                floor_bm_tags.append(tag)
-
-        beam_tags.append(floor_bm_tags)
-
-    ops.region(201, '-eleOnly', *beam_tags[0])  # Region for all beams on 1st floor
-    ops.region(202, '-eleOnly', *beam_tags[1])  # Region for all beams on 2nd floor
-    ops.region(203, '-eleOnly', *beam_tags[2])  # Region for all beams on 3rd floor
-    ops.region(204, '-eleOnly', *beam_tags[3])  # Region for all beams on 4th floor
-    ops.region(205, '-eleOnly', *beam_tags[4])  # Region for all beams on 5th floor
-    ops.region(206, '-eleOnly', *beam_tags[5])  # Region for all beams on 6th floor
-    ops.region(207, '-eleOnly', *beam_tags[6])  # Region for all beams on 7th floor
-    ops.region(208, '-eleOnly', *beam_tags[7])  # Region for all beams on 8th floor
-    ops.region(209, '-eleOnly', *beam_tags[8])  # Region for all beams on 9th floor
-    ops.region(210, '-eleOnly', *beam_tags[9])  # Region for all beams on 10th floor
-    ops.region(211, '-eleOnly', *beam_tags[10]) # Region for all beams on 11th floor
-
-    # ============================================================================
-    # Gravity analysis
-    # ============================================================================
-    ops.wipeAnalysis()
-    ops.loadConst('-time', 0.0)
-    num_step_sWgt = 1     # Set weight increments
-
-    ops.constraints('Penalty', 1.0e17, 1.0e17)
-    ops.test('NormDispIncr', 1e-6, 100, 0)
-    ops.algorithm('KrylovNewton')
-    ops.numberer('RCM')
-    ops.system('ProfileSPD')
-    ops.integrator('LoadControl', 1, 1, 1, 1)
-    ops.analysis('Static')
-
-    ops.analyze(num_step_sWgt)
+    build_model(optim_params)
 
     # ============================================================================
     # Eigen Analysis
@@ -494,7 +354,7 @@ def build_model(optim_params):
     periods = [1/freq for freq in nat_freq]
 
     # Apply Damping
-    damping_ratio = 0.025  # 2.5% Damping
+    damping_ratio = 0.05  # 5% Damping
 
     # Mass and stiffness proportional damping will be applied
     mass_prop_switch = 1.0
@@ -535,22 +395,6 @@ def build_model(optim_params):
         mrsa_res_folder = './optimization_results/mrsa_results/dir' + axis[ii] + '/'
         os.makedirs(mrsa_res_folder, exist_ok=True)
 
-        # Create recorders for beam-response in direction of excitation
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor01_beamResp.txt', '-precision', 16, '-region', 201, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor02_beamResp.txt', '-precision', 16, '-region', 202, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor03_beamResp.txt', '-precision', 16, '-region', 203, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor04_beamResp.txt', '-precision', 16, '-region', 204, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor05_beamResp.txt', '-precision', 16, '-region', 205, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor06_beamResp.txt', '-precision', 16, '-region', 206, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor07_beamResp.txt', '-precision', 16, '-region', 207, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor08_beamResp.txt', '-precision', 16, '-region', 208, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor09_beamResp.txt', '-precision', 16, '-region', 209, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor10_beamResp.txt', '-precision', 16, '-region', 210, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor11_beamResp.txt', '-precision', 16, '-region', 211, 'force')
-
-        # Base shear
-        ops.recorder('Node', '-file', mrsa_res_folder + 'baseShear' + axis[ii] + '.txt', '-node', *smf_node_tags['00'].tolist(), '-dof', direcs[ii], 'reaction')
-
         # Recorders for COM displacement
         ops.recorder('Node', '-file', mrsa_res_folder + 'COM_disp' + axis[ii] + '.txt', '-node', *list(com_node_tags.values()), '-dof', direcs[ii], 'disp')
 
@@ -560,7 +404,7 @@ def build_model(optim_params):
         # Shut down recorder for current direction of excitation
         ops.remove('recorders')
 
-    # # Clear model
+    # Clear model
     ops.wipe()
 
     # ============================================================================
@@ -587,35 +431,201 @@ def build_model(optim_params):
                                             fault_factor, perform_factor, ductility_factor,
                                             seismic_weight)
 
+    elf_force_distrib = nz_horiz_force_distribution(elf_base_shear, story_weights,
+                                                np.cumsum(story_heights))
+
     # Compute factors for scaling MRSA demands to ELF demands NZS 1170.5:2004 - Sect. 5.2.2.2b
     elf_mrsaX_scale_factor = max(elf_base_shear / mrsa_base_shearX, 1.0)
     elf_mrsaY_scale_factor = max(elf_base_shear / mrsa_base_shearY, 1.0)
 
-    # ============================================================================
+    # =========================================================================
     # Check drift and stability requirements
-    # ============================================================================
-
-    # Deflection amplification factors
-    kp  = 0.015 + 0.0075*(ductility_factor - 1)
-    kp = min(max(0.0015, kp), 0.03)
-
-    pdelta_fac = (kp * seismic_weight + elf_base_shear) / elf_base_shear  # NZS 1170.5-2004: Sec 7.2.1.2 & 6.5.4.1
-    # pdelta_fac = 1
-
+    # =========================================================================
     drift_modif_fac = 1.5  # NZS 1170.5-2004: Table 7.1
 
     # Compute story drifts
-    # For MRSA in x-direction
     com_dispX = np.loadtxt('./optimization_results/mrsa_results/dirX/COM_dispX.txt')
-    story_driftX = compute_story_drifts(com_dispX, story_heights, angular_freq, damping_ratio, num_modes)
-
-    # For MRSA in y-direction
     com_dispY = np.loadtxt('./optimization_results/mrsa_results/dirY/COM_dispY.txt')
-    story_driftY = compute_story_drifts(com_dispY, story_heights, angular_freq, damping_ratio, num_modes)
 
-    # Amplify drifts by required factors
-    story_driftX *=  (elf_mrsaX_scale_factor * ductility_factor * pdelta_fac * drift_modif_fac)
-    story_driftY *=  (elf_mrsaY_scale_factor * ductility_factor * pdelta_fac * drift_modif_fac)
+    if pdelta_method == 'A':
+
+        # Deflection amplification factors
+        kp  = 0.015 + 0.0075*(ductility_factor - 1)
+        kp = min(max(0.0015, kp), 0.03)
+
+        pdelta_fac = (kp * seismic_weight + elf_base_shear) / elf_base_shear  # NZS 1170.5-2004: Sec 7.2.1.2 & 6.5.4.1
+
+        # Compute story drifts
+        # For MRSA in x-direction
+        story_driftX = compute_story_drifts(com_dispX, story_heights, angular_freq, damping_ratio, num_modes)
+
+        # For MRSA in y-direction
+        story_driftY = compute_story_drifts(com_dispY, story_heights, angular_freq, damping_ratio, num_modes)
+
+        # Amplify drifts by required factors
+        story_driftX *=  (elf_mrsaX_scale_factor * ductility_factor * pdelta_fac * drift_modif_fac)
+        story_driftY *=  (elf_mrsaY_scale_factor * ductility_factor * pdelta_fac * drift_modif_fac)
+
+    else: # pdelta_method == 'B':
+        # Modal combination on peak COM displacements from MRSA
+        mrsa_total_com_dispX = modal_combo(com_dispX, angular_freq, damping_ratio, num_modes)
+        mrsa_total_com_dispY = modal_combo(com_dispY, angular_freq, damping_ratio, num_modes)
+
+        # Scale COM displacements by elf-to-mrsa base shear factor # NZS 1170.5-2004: Sect 5.2.2.2b
+        mrsa_total_com_dispX *= elf_mrsaX_scale_factor
+        mrsa_total_com_dispY *= elf_mrsaY_scale_factor
+
+        # Amplify COM displacements by ductility factor
+        # NZS 1170.5:2004 Commentary Sect. C6.5.4.2 Step 2
+        mrsa_total_com_dispX *= ductility_factor
+        mrsa_total_com_dispY *= ductility_factor
+
+        # Compute interstory displacements
+        inter_story_dispX = np.insert(np.diff(mrsa_total_com_dispX), 0, mrsa_total_com_dispX[0])
+        inter_story_dispY = np.insert(np.diff(mrsa_total_com_dispY), 0, mrsa_total_com_dispY[0])
+
+        # Compute story shear force due to PDelta actions
+        # NZS 1170.5:2004 Commentary Sect. C6.5.4.2 Step 3a
+        story_shear_forceX  = story_weights * inter_story_dispX / story_heights
+        story_shear_forceY  = story_weights * inter_story_dispY / story_heights
+
+        # Compute lateral forces to be used in static analysis for PDelta effects
+        # NZS 1170.5:2004 Commentary Sect. C6.5.4.2 Step 3b
+        lateral_forces_pDeltaX = np.insert(np.diff(story_shear_forceX), 0, story_shear_forceX[0])
+        lateral_forces_pDeltaY = np.insert(np.diff(story_shear_forceY), 0, story_shear_forceY[0])
+
+    # =========================================================================
+    # Perform static analysis for accidental torsional moment & PDelta effects
+    # =========================================================================
+    floor_dimen_x = 29.410 * m
+    floor_dimen_y = 31.025 * m
+
+    accid_ecc_x = floor_dimen_x / 10
+    accid_ecc_y = floor_dimen_y / 10
+
+    torsional_mom_x = elf_force_distrib * accid_ecc_y
+    torsional_mom_y = elf_force_distrib * accid_ecc_x
+
+    # AMPLIFY TORSIONAL MOMENT IF REQUIRED BY CODE
+    # New Zealand does not require amplification of accidental torsional moment
+
+    torsional_direc = ['X', 'Y']
+    elf_dof = [1, 2]
+    torsional_sign = [1, -1]
+    torsional_folder = ['positive', 'negative']
+
+    # Perform static analysis for loading in X & Y direction
+    for ii in range(len(torsional_direc)):
+
+        # For each direction, account for positive & negative loading
+        for jj in range(len(torsional_sign)):
+            print('\nNow commencing static analysis using torsional moments for '
+                  + torsional_folder[jj] + ' ' + torsional_direc[ii] + ' direction.')
+
+            build_model(optim_params)
+
+            # Impose torsional moments at COMs
+            com_nodes = list(com_node_tags.values())
+
+            # Assign torsional moments
+            ts_tag = 20000
+            pattern_tag = 20000
+
+            ops.timeSeries('Constant', ts_tag)
+            ops.pattern('Plain', pattern_tag, ts_tag)
+
+            # Loop through each COM node and apply torsional moment & PDelta lateral force if applicable
+            for kk in range(len(com_nodes)):
+                if torsional_direc[ii] == 'X' and pdelta_method == "A":  # Only torsional moment is applied about z-axis
+                    ops.load(com_nodes[kk], 0., 0., 0., 0., 0., torsional_mom_x[kk] * torsional_sign[jj])
+
+                elif torsional_direc[ii] == 'X' and pdelta_method == "B": # Torsional moment about z-axis & PDelta "Method B" forces are applied
+                    ops.load(com_nodes[kk], lateral_forces_pDeltaX[kk], 0., 0., 0., 0., torsional_mom_x[kk] * torsional_sign[jj])
+
+                elif torsional_direc[ii] == 'Y' and pdelta_method == "A":  # Only torsional moment is applied about z-axis
+                    ops.load(com_nodes[kk], 0., 0., 0., 0., 0., torsional_mom_y[kk] * torsional_sign[jj])
+
+                elif torsional_direc[ii] == 'Y' and pdelta_method == "B":  # Torsional moment about z-axis & PDelta "Method B" forces are applied
+                    ops.load(com_nodes[kk], 0., lateral_forces_pDeltaY[kk], 0., 0., 0., torsional_mom_y[kk] * torsional_sign[jj])
+
+            # Create directory to save results
+            accident_torsion_res_folder = './optimization_results/accidental_torsion_results/' + torsional_folder[jj] + torsional_direc[ii] + '/'
+            os.makedirs(accident_torsion_res_folder, exist_ok=True)
+
+            # Recorders for COM displacement
+            ops.recorder('Node', '-file', accident_torsion_res_folder + 'COM_disp' + torsional_direc[ii] + '.txt',
+                         '-node', *list(com_node_tags.values()), '-dof', elf_dof[ii], 'disp')
+
+            # Perform static analysis
+            num_step_sWgt = 1     # Set weight increments
+
+            ops.constraints('Penalty', 1.0e17, 1.0e17)
+            ops.test('NormDispIncr', 1e-6, 100, 0)
+            ops.algorithm('KrylovNewton')
+            ops.numberer('RCM')
+            ops.system('ProfileSPD')
+            ops.integrator('LoadControl', 1, 1, 1, 1)
+            ops.analysis('Static')
+
+            ops.analyze(num_step_sWgt)
+
+            # Shut down recorders
+            ops.remove('recorders')
+
+            # Clear model
+            ops.wipe()
+
+    print('\nStatic analysis for accidental torsion completed...')
+
+    if pdelta_method == "B":
+        # Process drifts due to PDelta lateral forces
+        pdelta_com_disp_posX = np.loadtxt('./optimization_results/accidental_torsion_results/positiveX/COM_dispX.txt')
+        pdelta_com_disp_negX = np.loadtxt('./optimization_results/accidental_torsion_results/negativeX/COM_dispX.txt')
+        pdelta_com_disp_posY = np.loadtxt('./optimization_results/accidental_torsion_results/positiveY/COM_dispY.txt')
+        pdelta_com_disp_negY = np.loadtxt('./optimization_results/accidental_torsion_results/negativeY/COM_dispY.txt')
+
+        pdelta_com_dispX = np.maximum(pdelta_com_disp_posX, pdelta_com_disp_negX)
+        pdelta_com_dispY = np.maximum(pdelta_com_disp_posY, pdelta_com_disp_negY)
+
+        # Determine subsoil factor NZS 1170.5:2004 Sect. C6.5.4.2 Step 4
+        # Case study building is in site subclass C.
+        if periods[0] < 2.0:
+            subsoil_factor_K = 1.0
+        elif 2.0 <= periods[0] <= 4.0:
+            subsoil_factor_K = (6 - periods[0]) / 4
+        else:
+            subsoil_factor_K = 4
+
+
+        if ductility_factor <= 3.5:
+            subsoil_factor_beta = 2 * ductility_factor * subsoil_factor_K / 3.5
+        else:
+            subsoil_factor_beta = 2 * subsoil_factor_K
+
+        subsoil_factor_beta = max(subsoil_factor_beta, 1.0)
+
+        # When using method B, element demands need to be scaled up by subsoil_factor_beta
+        # pdelta_fac = subsoil_factor_beta
+
+        # Amplify PDelta COM displacements by subsoil_factor_beta and ductility factor
+        pdelta_com_dispX *= (subsoil_factor_beta * ductility_factor)
+        pdelta_com_dispY *= (subsoil_factor_beta * ductility_factor)
+
+        # Add up COM displacements fropm MRSA & PDelta checks
+        total_com_dispX = mrsa_total_com_dispX + pdelta_com_dispX
+        total_com_dispY = mrsa_total_com_dispY + pdelta_com_dispY
+
+        # Compute total interstory displacements
+        total_inter_story_dispX = np.insert(np.diff(total_com_dispX), 0, total_com_dispX[0])
+        total_inter_story_dispY = np.insert(np.diff(total_com_dispY), 0, total_com_dispY[0])
+
+        # Compute story drift ratios
+        story_driftX  = total_inter_story_dispX / story_heights * 100
+        story_driftY  = total_inter_story_dispY / story_heights * 100
+
+        # Amplify story drift ration by drift factor
+        story_driftX *= drift_modif_fac
+        story_driftY *= drift_modif_fac
 
     # CHECK DRIFT REQUIREMENTS
     max_story_drift = max(story_driftX.max(), story_driftY.max())
@@ -623,12 +633,157 @@ def build_model(optim_params):
     return max_story_drift
 
 
+def build_model(optim_params):
+
+    print(optim_params)
+
+    # The geometric properties of the beams will be defined relative to the stiffness of the first floor beam
+    base_Ix = optim_params[0]  # No need to multiply by 'mm' or '1E6'
+    slope_Ix_line = optim_params[1]
+
+    col_group_heights = np.array([0, 6.2, 15.5, 24.8, 31])  # Height of column groups from the 1st floor
+
+    # Assume linear relationship
+    beam_Ix_distrib = 1 - slope_Ix_line*col_group_heights
+
+    # ============================================================================
+    # Define beam section properties
+    # ============================================================================
+    bm_sect_flr_1 = nzs_beams.loc[nzs_beams.index[nzs_beams['Ix'] >= beam_Ix_distrib[0] * base_Ix].tolist()[-1]]
+    bm_sect_flr_2_to_4 = nzs_beams.loc[nzs_beams.index[nzs_beams['Ix'] >= beam_Ix_distrib[1] * base_Ix].tolist()[-1]]
+    bm_sect_flr_5_to_7 = nzs_beams.loc[nzs_beams.index[nzs_beams['Ix'] >= beam_Ix_distrib[2] * base_Ix].tolist()[-1]]
+    bm_sect_flr_8_to_10 = nzs_beams.loc[nzs_beams.index[nzs_beams['Ix'] >= beam_Ix_distrib[3] * base_Ix].tolist()[-1]]
+    bm_sect_flr_11 = nzs_beams.loc[nzs_beams.index[nzs_beams['Ix'] >= beam_Ix_distrib[4] * base_Ix].tolist()[-1]]
+
+
+    # bm_sections = [bm_sect_flr_1.name, bm_sect_flr_2_to_4.name, bm_sect_flr_5_to_7.name, bm_sect_flr_8_to_10.name, bm_sect_flr_11.name]
+    # print('Beam sections: ', bm_sections)
+
+    bm_prop_flr_1 = [bm_sect_flr_1, bm_E, bm_G, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
+    bm_prop_flr_2_to_4 = [bm_sect_flr_2_to_4, bm_E, bm_G, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
+    bm_prop_flr_5_to_7 = [bm_sect_flr_5_to_7, bm_E, bm_G, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
+    bm_prop_flr_8_to_10 = [bm_sect_flr_8_to_10, bm_E, bm_G, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
+    bm_prop_flr_11 = [bm_sect_flr_11, bm_E, bm_G, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
+
+    # ============================================================================
+    # Define column section properties
+    # ============================================================================
+    col_beam_mom_ratio = 1.25  # Overstrength factor per NZS 3404.1:1997 - Table 12.2.8(1)
+
+    col_sect_flr_1 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= col_beam_mom_ratio * bm_sect_flr_1['Zx']].tolist()[-1]]
+    col_sect_flr_2_to_4 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= col_beam_mom_ratio * bm_sect_flr_2_to_4['Zx']].tolist()[-1]]
+    col_sect_flr_5_to_7 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= col_beam_mom_ratio * bm_sect_flr_5_to_7['Zx']].tolist()[-1]]
+    col_sect_flr_8_to_10 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= col_beam_mom_ratio * bm_sect_flr_8_to_10['Zx']].tolist()[-1]]
+    col_sect_flr_11 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= col_beam_mom_ratio * bm_sect_flr_11['Zx']].tolist()[-1]]
+
+    # col_sections = [col_sect_flr_1.name, col_sect_flr_2_to_4.name, col_sect_flr_5_to_7.name, col_sect_flr_8_to_10.name, col_sect_flr_11.name]
+    # print('Column sections: ', col_sections)
+
+    col_prop_flr_1 = [col_sect_flr_1, col_E, col_G, col_transf_tag_EW, col_transf_tag_NS, pzone_transf_tag_col]
+    col_prop_flr_2_to_4 = [col_sect_flr_2_to_4, col_E, col_G, col_transf_tag_EW, col_transf_tag_NS, pzone_transf_tag_col]
+    col_prop_5_to_7 = [col_sect_flr_5_to_7, col_E, col_G, col_transf_tag_EW, col_transf_tag_NS, pzone_transf_tag_col]
+    col_prop_8_to_10 = [col_sect_flr_8_to_10, col_E, col_G, col_transf_tag_EW, col_transf_tag_NS, pzone_transf_tag_col]
+    col_prop_flr_11 = [col_sect_flr_11, col_E, col_G, col_transf_tag_EW, col_transf_tag_NS, pzone_transf_tag_col]
+
+
+    # Model Builder
+    ops.wipe()
+    ops.model('basic', '-ndm', 3, '-ndf', 6)
+
+    # Create shell material for floor diaphragm
+    ops.nDMaterial('ElasticIsotropic', nD_mattag, shell_E, shell_nu)
+    ops.nDMaterial('PlateFiber', plate_fiber_tag, nD_mattag)
+    ops.section('LayeredShell', shell_sect_tag, 3, plate_fiber_tag, fiber_thick, plate_fiber_tag, fiber_thick, plate_fiber_tag, fiber_thick)
+
+    # Define geometric transformation for beams
+    ops.geomTransf('PDelta', bm_transf_tag_x, 0, -1, 0)
+    ops.geomTransf('PDelta', bm_transf_tag_y, 1, 0, 0)  # -1, 0, 0
+
+    # Define geometric transformation for columns
+    ops.geomTransf('PDelta', col_transf_tag_EW, 0, 1, 0)
+    ops.geomTransf('PDelta', col_transf_tag_NS, 0, 1, 0)
+
+    # Define geometric transformation for rigid panel zone elements
+    ops.geomTransf('Linear', pzone_transf_tag_col, 0, 1, 0)
+    ops.geomTransf('Linear', pzone_transf_tag_bm_x, 0, -1, 0)
+    ops.geomTransf('Linear', pzone_transf_tag_bm_y, 1, 0, 0)
+
+    # Create all floors of building
+    # print('Now creating SSMF model... \n')
+
+    create_floor(ground_flr, '00')
+    create_floor(flr1, '01', bm_prop_flr_1, col_prop_flr_1, '1st')
+    create_floor(flr2, '02', bm_prop_flr_2_to_4, col_prop_flr_2_to_4, '2nd')
+    create_floor(flr3, '03', bm_prop_flr_2_to_4, col_prop_flr_2_to_4, '3rd')
+    create_floor(flr4, '04', bm_prop_flr_2_to_4, col_prop_flr_2_to_4, '4th')
+    create_floor(flr5, '05', bm_prop_flr_5_to_7, col_prop_5_to_7, '5th')
+    create_floor(flr6, '06', bm_prop_flr_5_to_7, col_prop_5_to_7, '6th')
+    create_floor(flr7, '07', bm_prop_flr_5_to_7, col_prop_5_to_7, '7th')
+    create_floor(flr8, '08', bm_prop_flr_8_to_10, col_prop_8_to_10, '8th')
+    create_floor(flr9, '09', bm_prop_flr_8_to_10, col_prop_8_to_10, '9th')
+    create_floor(flr10, '10', bm_prop_flr_8_to_10, col_prop_8_to_10, '10th')
+    create_floor(roof_flr, '11', bm_prop_flr_11, col_prop_flr_11, 'Roof')
+
+    # # ============================================================================
+    # # Create regions for SMF beams based on floor
+    # # ============================================================================
+    # # Get all element tags
+    # elem_tags = ops.getEleTags()
+
+    # floor_nums = ['01', '02', '03', '04', '05', '06',
+    #               '07', '08', '09', '10', '11']
+
+    # beam_tags = []
+
+    # for floor in floor_nums:
+    #     floor_bm_tags = []
+
+    #     for tag in elem_tags:
+
+    #         # Only select beam elements
+    #         if str(tag).startswith('2' + floor):
+    #             floor_bm_tags.append(tag)
+
+    #     beam_tags.append(floor_bm_tags)
+
+    # ops.region(201, '-eleOnly', *beam_tags[0])  # Region for all beams on 1st floor
+    # ops.region(202, '-eleOnly', *beam_tags[1])  # Region for all beams on 2nd floor
+    # ops.region(203, '-eleOnly', *beam_tags[2])  # Region for all beams on 3rd floor
+    # ops.region(204, '-eleOnly', *beam_tags[3])  # Region for all beams on 4th floor
+    # ops.region(205, '-eleOnly', *beam_tags[4])  # Region for all beams on 5th floor
+    # ops.region(206, '-eleOnly', *beam_tags[5])  # Region for all beams on 6th floor
+    # ops.region(207, '-eleOnly', *beam_tags[6])  # Region for all beams on 7th floor
+    # ops.region(208, '-eleOnly', *beam_tags[7])  # Region for all beams on 8th floor
+    # ops.region(209, '-eleOnly', *beam_tags[8])  # Region for all beams on 9th floor
+    # ops.region(210, '-eleOnly', *beam_tags[9])  # Region for all beams on 10th floor
+    # ops.region(211, '-eleOnly', *beam_tags[10]) # Region for all beams on 11th floor
+
+    # ============================================================================
+    # Gravity analysis
+    # ============================================================================
+    ops.wipeAnalysis()
+    ops.loadConst('-time', 0.0)
+    num_step_sWgt = 1     # Set weight increments
+
+    ops.constraints('Penalty', 1.0e17, 1.0e17)
+    ops.test('NormDispIncr', 1e-6, 100, 0)
+    ops.algorithm('KrylovNewton')
+    ops.numberer('RCM')
+    ops.system('ProfileSPD')
+    ops.integrator('LoadControl', 1, 1, 1, 1)
+    ops.analysis('Static')
+
+    ops.analyze(num_step_sWgt)
+
+    ops.wipeAnalysis()
+
+
 # Initialize array of possible values for beam Ix
 bm_Ix_vals = np.array(list(nzs_beams['Ix']))
 bm_Zx_vals = np.array(list(nzs_beams['Zx']))
 
 # Maximum beam section will be a function of Zx to enable capacity design
-max_bm_Zx = bm_Zx_vals.max() / 1.25
+max_bm_Zx = bm_Zx_vals.max() / 1.25 # (Divided by 1.25 so there is an available column)
 
 # Define bounds on possible values for first floor beam Ix.
 bm_Ix_min = bm_Ix_vals.min()
@@ -648,12 +803,12 @@ bm_Ix_slope_bounds = (bm_Ix_slope_min, bm_Ix_slope_max)
 init_time = time.time()
 
 nv = 2  # number of variables
-optim = -1  # if minimization problem, optim = -1; if maximization problem, optim = 1
+optim_prob = -1  # if minimization problem, optim_prob = -1; if maximization problem, optim_prob = 1
 
 bounds = [bm_Ix_bounds, bm_Ix_slope_bounds]
 
 particle_size = 50 * nv  # number of particles
-iterations = 50  # max number of iterations
+# iterations = 1  # max number of iterations
 
 w = 0.9   # inertia constant  0.75
 c1 = 0.5  # cognitive constant
@@ -664,9 +819,9 @@ c2 = 2    # social constant
 
 
 # ------------------------------------------------------------------------------
-if optim == -1:
+if optim_prob == -1:
     initial_fitness = float("inf")  # for minimization problem
-if optim == 1:
+if optim_prob == 1:
     initial_fitness = -float("inf")  # for maximization problem
 # -----------------------------------------------------------------------------
 
@@ -684,15 +839,15 @@ class Particle:
                 random.uniform(bounds[i][0], bounds[i][1]))  # generate random initial position
             self.particle_velocity.append(random.uniform(-1, 1))  # generate random initial velocity
 
-    def evaluate(self, build_model):
-        self.fitness_particle_position = build_model(self.particle_position)
+    def evaluate(self, objective_func):
+        self.fitness_particle_position = objective_func(self.particle_position)
         # print(self.fitness_particle_position)
 
-        if optim == -1:
+        if optim_prob == -1:
             if self.fitness_particle_position < self.fitness_local_best_particle_position:
                 self.local_best_particle_position = self.particle_position  # update the local best
                 self.fitness_local_best_particle_position = self.fitness_particle_position  # update the fitness of the local best
-        if optim == 1:
+        if optim_prob == 1:
             if self.fitness_particle_position > self.fitness_local_best_particle_position:
                 self.local_best_particle_position = self.particle_position  # update the local best
                 self.fitness_local_best_particle_position = self.fitness_particle_position  # update the fitness of the local best
@@ -718,7 +873,8 @@ class Particle:
             if self.particle_position[i] < bounds[i][0]:
                 self.particle_position[i] = bounds[i][1] - ((bounds[i][0] - self.particle_position[i]) % np.abs(bounds[i][0] - bounds[i][1]))
 
-fitness_global_best_particle_position = initial_fitness
+global_best_drift_difference = initial_fitness
+global_best_drift = initial_fitness
 global_best_particle_position = []
 
 # Build swarm
@@ -736,33 +892,45 @@ iter_count = 0
 drift_limit = 2.5  # in percent
 
 # for i in range(iterations):
-while fitness_global_best_particle_position > drift_limit:
+while global_best_drift > drift_limit and global_best_drift_difference > 0.1:
     print("Iteration {}".format(iter_count+1))
 
     # cycle through particles in swarm and evaluate fitness
     for j in range(particle_size):
-        swarm[j].evaluate(build_model)
+        print("Particle " + str(j+1))
+        swarm[j].evaluate(objective_func)
+        print("Drift: {:.3f}%".format(swarm[j].fitness_particle_position))
 
         # determine if current particle is the best (globally)
-        if optim == -1:
-            if swarm[j].fitness_particle_position < fitness_global_best_particle_position:
+        if optim_prob == -1:
+            print("Best drift difference as at last iteration: {:.3f}%".format(global_best_drift_difference))
+
+            drift_diff = abs(swarm[j].fitness_particle_position - drift_limit)
+            print("Drift difference for current iteration : {:.3f}%".format(drift_diff))
+
+            if drift_diff < global_best_drift_difference and swarm[j].fitness_particle_position < drift_limit:
                 global_best_particle_position = list(swarm[j].particle_position)
-                fitness_global_best_particle_position = float(swarm[j].fitness_particle_position)
-        if optim == 1:
-            if swarm[j].fitness_particle_position > fitness_global_best_particle_position:
+                global_best_drift = float(swarm[j].fitness_particle_position)
+                global_best_drift_difference = float(drift_diff)
+
+        if optim_prob == 1:
+            if swarm[j].fitness_particle_position > global_best_drift_difference:
                 global_best_particle_position = list(swarm[j].particle_position)
-                fitness_global_best_particle_position = float(swarm[j].fitness_particle_position)
+                global_best_drift_difference = float(swarm[j].fitness_particle_position)
+
+        print("New best drift diff: {:.3f}%".format(global_best_drift_difference))
+        print("")
 
    # cycle through swarm and update velocities and position
     for j in range(particle_size):
         swarm[j].update_velocity(global_best_particle_position)
         swarm[j].update_position(bounds)
 
-    fitness_history.append(fitness_global_best_particle_position)  # record the best fitness
+    fitness_history.append(global_best_drift_difference)  # record the best fitness
     param_history.append(global_best_particle_position)  # record associated fitness parameters for each iteration
 
     print('iteration: {}, best_solution: {}, best_fitness: {}'.format(iter_count+1, global_best_particle_position,
-                                                                      fitness_global_best_particle_position))
+                                                                      global_best_drift_difference))
 
     if iter_count > 0:
         if abs(fitness_history[-1] - fitness_history[-2]) < tol:
@@ -773,10 +941,12 @@ while fitness_global_best_particle_position > drift_limit:
         if converg_count == 20:
             break
 
+    print("After iter {}: ".format(iter_count+1), global_best_drift, global_best_drift_difference)
+    print("")
     iter_count += 1
 
 print('Optimal solution:', global_best_particle_position)
-print('Objective function value:', fitness_global_best_particle_position)
+print('Objective function value:', global_best_drift_difference)
 
 run_time = time.time() - init_time
 print("\nRun time:  {} secs".format(run_time))
