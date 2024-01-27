@@ -206,13 +206,14 @@ col_G = col_E / (2*(1 + col_nu))
 col_transf_tag_EW = 1
 col_transf_tag_NS = 2
 
+ductility_factor = 4.0  # SMF Category 1 structure (Basically response modification R & deflection amplification Cd factoor)
+
 # ============================================================================
 # Initialize dictionary to store node tags of COM for all floors
 # Initialize dictionary to store total mass of each floor
 # ============================================================================
 com_node_tags = {}
 total_floor_mass = {}
-
 
 # ============================================================================
 # Define function to create a floor
@@ -380,7 +381,7 @@ def objective_func(optim_params):
     # ============================================================================
 
     # Load spectral accelerations and periods for response spectrum
-    spect_acc = np.loadtxt('../nz_spectral_acc.txt')
+    spect_acc = np.loadtxt('../nz_spectral_acc.txt') / ductility_factor
     spect_periods = np.loadtxt('../nz_periods.txt')
 
     direcs = [1, 2]  # Directions for MRSA
@@ -422,7 +423,6 @@ def objective_func(optim_params):
     return_per_factor_uls = 1.3
     fault_factor = 1.0
     perform_factor = 0.7
-    ductility_factor = 4.0  # Category 1 structure
     story_weights = np.array(list(total_floor_mass.values())) * grav_metric
     seismic_weight = story_weights.sum()
 

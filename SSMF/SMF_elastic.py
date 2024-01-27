@@ -8,6 +8,7 @@ Created on Thu May 25 17:43:33 2023
 import os
 import sys
 import openseespy.opensees as ops
+import opsvis as opsv
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -225,8 +226,8 @@ bm_transf_tag_y = 4  # Beams oriented in Global-Y direction
 bm_mom_inertia_strong = np.array(list(nzs_beams['Ix']))
 
 # The geometric properties of the beams will be defined relative to the stiffness of the first floor beam
-base_Ix = 3969.261981783726 # No need to multiply by 'mm' or '1E6' 10367.365120546241
-slope_Ix_line = 0.01701408520797944  # 0.0035511206867118853
+base_Ix = 369.56639854764785 # No need to multiply by 'mm' or '1E6' 3561.843753793359, 0.015280903208116023
+slope_Ix_line = 0.009959027983246023
 col_group_heights = np.array([0, 6.2, 15.5, 24.8, 31])  # Height of column groups from the 1st floor
 
 # Assume linear relationship
@@ -286,6 +287,7 @@ col_prop_5_to_7 = [col_sect_flr_5_to_7, col_E, col_G, col_transf_tag_EW, col_tra
 col_prop_8_to_10 = [col_sect_flr_8_to_10, col_E, col_G, col_transf_tag_EW, col_transf_tag_NS, pzone_transf_tag_col]
 col_prop_flr_11 = [col_sect_flr_11, col_E, col_G, col_transf_tag_EW, col_transf_tag_NS, pzone_transf_tag_col]
 
+ductility_factor = 4.0  # SMF Category 1 structure (Basically response modification R & deflection amplification Cd factoor)
 
 # ============================================================================
 # Initialize dictionary to store node tags of COM for all floors
@@ -526,6 +528,7 @@ def build_model():
 
 # Generate model
 build_model()
+opsv.plot_model(node_labels=0, element_labels=0)
 
 # Create pvd recorder
 record_direc = './pvd/'
@@ -620,7 +623,7 @@ mrsa = 1
 if mrsa:
 
     # Load spectral accelerations and periods for response spectrum
-    spect_acc = np.loadtxt('../nz_spectral_acc.txt')
+    spect_acc = np.loadtxt('../nz_spectral_acc.txt') / ductility_factor
     spect_periods = np.loadtxt('../nz_periods.txt')
 
     direcs = [1, 2]  # Directions for MRSA
@@ -725,7 +728,6 @@ return_per_factor_sls = 0.25
 return_per_factor_uls = 1.3
 fault_factor = 1.0
 perform_factor = 0.7
-ductility_factor = 4.0  # SMF
 story_weights = np.array(list(total_floor_mass.values())) * grav_metric
 seismic_weight = story_weights.sum()
 
@@ -918,7 +920,8 @@ for ii in range(len(torsional_direc)):
         ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor11_colResp.txt', '-precision', 9, '-region', 311, 'force')
 
         # Recorders for COM displacement
-        ops.recorder('Node', '-file', accident_torsion_res_folder + 'COM_disp' + torsional_direc[ii] + '.txt', '-node', *list(com_node_tags.values()), '-dof', elf_dof[ii], 'disp')
+        ops.recorder('Node', '-file', accident_torsion_res_folder + 'COM_disp' + torsional_direc[ii] + '.txt',
+                     '-node', *list(com_node_tags.values()), '-dof', elf_dof[ii], 'disp')
 
         # Base shear
         ops.recorder('Node', '-file', accident_torsion_res_folder + 'baseShear' + torsional_direc[ii] + '.txt', '-node',

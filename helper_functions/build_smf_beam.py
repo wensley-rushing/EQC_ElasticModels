@@ -38,20 +38,45 @@ steel_E = 210 * GPa
 def create_beams(floor_num, elev, com_node, smf_node_tags, smf_coords_df, bm_prop, col_prop):
     bm_tag = int('2' + floor_num + '01')   # 20101
 
-    create_bm_joint_offset(bm_tag, 'col2',  'col3', floor_num, elev, 'EW', com_node, smf_node_tags, smf_coords_df, bm_prop, col_prop)  # Beam 1
-    create_bm_joint_offset(bm_tag + 1, 'col3',  'col4', floor_num, elev, 'EW', com_node, smf_node_tags, smf_coords_df, bm_prop, col_prop)  # Beam 2
-    create_bm_joint_offset(bm_tag + 2, 'col4',  'col5', floor_num, elev, 'EW', com_node, smf_node_tags, smf_coords_df, bm_prop, col_prop)  # Beam 3
-    create_bm_joint_offset(bm_tag + 3, 'col14',  'col15', floor_num, elev, 'EW', com_node, smf_node_tags, smf_coords_df, bm_prop, col_prop)  # Beam 4
-    create_bm_joint_offset(bm_tag + 4, 'col21',  'col22', floor_num, elev, 'EW', com_node, smf_node_tags, smf_coords_df, bm_prop, col_prop)  # Beam 5
-    create_bm_joint_offset(bm_tag + 5, 'col22',  'col23', floor_num, elev, 'EW', com_node, smf_node_tags, smf_coords_df, bm_prop, col_prop)  # Beam 6
+    create_bm_joint_offset(bm_tag, 'col2',  'col3', floor_num, elev, 'EW', com_node,
+                           smf_node_tags, smf_coords_df, bm_prop, col_prop)  # Beam 1
 
-    create_bm_joint_offset(bm_tag + 6, 'col1',  'col8', floor_num, elev, 'NS', com_node, smf_node_tags, smf_coords_df, bm_prop, col_prop)   # Beam 7
-    create_bm_joint_offset(bm_tag + 7, 'col8',  'col13', floor_num, elev, 'NS', com_node, smf_node_tags, smf_coords_df, bm_prop, col_prop)  # Beam 8
-    create_bm_joint_offset(bm_tag + 8, 'col11',  'col16', floor_num, elev, 'NS', com_node, smf_node_tags, smf_coords_df, bm_prop, col_prop)  # Beam 9
-    create_bm_joint_offset(bm_tag + 9, 'col16',  'col19', floor_num, elev, 'NS', com_node, smf_node_tags, smf_coords_df, bm_prop, col_prop)  # Beam 10
-    create_bm_joint_offset(bm_tag + 10, 'col7',  'col12', floor_num, elev, 'NS', com_node, smf_node_tags, smf_coords_df, bm_prop, col_prop)  # Beam 11
-    create_bm_joint_offset(bm_tag + 11, 'col12',  'col17', floor_num, elev, 'NS', com_node, smf_node_tags, smf_coords_df, bm_prop, col_prop)  # Beam 12
-    create_bm_joint_offset(bm_tag + 12, 'col17',  'col20', floor_num, elev, 'NS', com_node, smf_node_tags, smf_coords_df, bm_prop, col_prop)  # Beam 13
+    create_bm_joint_offset(bm_tag + 1, 'col3',  'col4', floor_num, elev, 'EW', com_node,
+                           smf_node_tags, smf_coords_df, bm_prop, col_prop)  # Beam 2
+
+    create_bm_joint_offset(bm_tag + 2, 'col4',  'col5', floor_num, elev, 'EW', com_node,
+                           smf_node_tags, smf_coords_df, bm_prop, col_prop)  # Beam 3
+
+    create_bm_joint_offset(bm_tag + 3, 'col14',  'col15', floor_num, elev, 'EW', com_node,
+                           smf_node_tags, smf_coords_df, bm_prop, col_prop)  # Beam 4
+
+    create_bm_joint_offset(bm_tag + 4, 'col21',  'col22', floor_num, elev, 'EW', com_node,
+                           smf_node_tags, smf_coords_df, bm_prop, col_prop)  # Beam 5
+
+    create_bm_joint_offset(bm_tag + 5, 'col22',  'col23', floor_num, elev, 'EW', com_node,
+                           smf_node_tags, smf_coords_df, bm_prop, col_prop)  # Beam 6
+
+
+    create_bm_joint_offset(bm_tag + 6, 'col6',  'col8', floor_num, elev, 'NS', com_node,
+                           smf_node_tags, smf_coords_df, bm_prop, col_prop)   # Beam 7
+
+    create_bm_joint_offset(bm_tag + 7, 'col8',  'col13', floor_num, elev, 'NS', com_node,
+                           smf_node_tags, smf_coords_df, bm_prop, col_prop)  # Beam 8
+
+    create_bm_joint_offset(bm_tag + 8, 'col11',  'col16', floor_num, elev, 'NS', com_node,
+                           smf_node_tags, smf_coords_df, bm_prop, col_prop)  # Beam 9
+
+    create_bm_joint_offset(bm_tag + 9, 'col16',  'col19', floor_num, elev, 'NS', com_node,
+                           smf_node_tags, smf_coords_df, bm_prop, col_prop)  # Beam 10
+
+    create_bm_joint_offset(bm_tag + 10, 'col7',  'col12', floor_num, elev, 'NS', com_node,
+                           smf_node_tags, smf_coords_df, bm_prop, col_prop)  # Beam 11
+
+    create_bm_joint_offset(bm_tag + 11, 'col12',  'col17', floor_num, elev, 'NS', com_node,
+                           smf_node_tags, smf_coords_df, bm_prop, col_prop)  # Beam 12
+
+    create_bm_joint_offset(bm_tag + 12, 'col17',  'col20', floor_num, elev, 'NS', com_node,
+                           smf_node_tags, smf_coords_df, bm_prop, col_prop)  # Beam 13
 
 
 # ============================================================================
