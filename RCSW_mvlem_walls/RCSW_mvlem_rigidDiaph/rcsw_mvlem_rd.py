@@ -32,17 +32,17 @@ build_model('rigid')
 angular_freq, periods, modal_prop = run_eigen_gravity_analysis()
 
 # # Load reaction forces due to gravity
-# grav_nodal_rxn = np.loadtxt('./gravity_results/' + 'nodeRxn.txt').T
-# grav_col_forces = np.loadtxt('./gravity_results/' + 'colForces.txt').T
-# grav_wall_nodal_forces = np.loadtxt('./gravity_results/' + 'WallForces.txt').T
+grav_nodal_rxn = np.loadtxt('./gravity_results/' + 'nodeRxn.txt').T
+grav_col_forces = np.loadtxt('./gravity_results/' + 'colForces.txt').T
+grav_wall_nodal_forces = np.loadtxt('./gravity_results/' + 'WallForces.txt').T
 
 # # Convert nodal rxns to dataframe
-# # grav_nodal_rxn_combined = pd.DataFrame(process_mvlem_element_demands(grav_nodal_rxn), columns=['Fz (kN)'],
-# #                                   index=list(wall_prop_df.index) + list(col_coords_df.index))
+# grav_nodal_rxn_combined = pd.DataFrame(process_mvlem_element_demands(grav_nodal_rxn), columns=['Fz (kN)'],
+#                                   index=list(wall_prop_df.index) + list(col_coords_df.index))
 
 # # Extract axial forces from element demands.
 # 'These values should equal `grav_nodal_wall_rxn`'
-# (_, _, grav_wall_elem_Fz, _, _, _) = get_mvlem_element_demands(grav_wall_nodal_forces)
+(_, _, grav_wall_elem_Fz, _, _, _) = get_mvlem_element_demands(grav_wall_nodal_forces)
 
 
 # # ============================================================================

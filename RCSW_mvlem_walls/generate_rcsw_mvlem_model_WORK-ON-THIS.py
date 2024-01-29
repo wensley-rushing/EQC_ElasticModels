@@ -589,15 +589,16 @@ def run_eigen_gravity_analysis():
     os.makedirs(record_direc, exist_ok=True)
     ops.recorder('PVD', record_direc, '-precision', 3, '-dT', 1, *['disp', 'reaction', 'mass', 'eigen', 10])
 
-    # ============================================================================
+    # ==========================================================================
     # Eigen Analysis
-    # ============================================================================
+    # =========================================================================
     angular_freq, periods, modal_prop = run_eigen_analysis(ops, num_modes, damping_ratio, './', 'RCSW')
 
 
     # Create recorder
     grav_direc = './gravity_results/'
     os.makedirs(grav_direc, exist_ok=True)
+
     ops.recorder('Element', '-file', grav_direc + 'colForces.txt', '-precision', 9,
                  '-region', 301, '-dof', 3, 'globalForce')  # 1st floor columns
 
@@ -777,7 +778,7 @@ def run_mrsa(angular_freq, elf_base_shear):
     mrsa_base_shearX = modal_combo(np.loadtxt('./mrsa_results/dirX/baseShearX.txt'), angular_freq, damping_ratio, num_modes).sum()
     mrsa_base_shearY = modal_combo(np.loadtxt('./mrsa_results/dirY/baseShearY.txt'), angular_freq, damping_ratio, num_modes).sum()
 
-    # Compute factors for scaling MRSA demands to ELF demands
+    # Compute factors for scaling MRSA demands to ELF demands NZS 1170.5:2004 - Sect. 5.2.2.2b
     elf_mrsaX_scale_factor = max(elf_base_shear / mrsa_base_shearX, 1)
     elf_mrsaY_scale_factor = max(elf_base_shear / mrsa_base_shearY, 1)
 

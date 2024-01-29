@@ -8,7 +8,7 @@ import numpy as np
 
 
 def nz_horiz_seismic_shear(spectral_shape_factor, hazard_factor, return_per_factor_sls,
-                           return_per_factor_uls, fault_factor, perform_factor, ductility_factor,
+                           return_per_factor_uls, fault_factor, perform_factor, inelastic_spectrum_fac,
                            seismic_weight):
 
     """
@@ -27,8 +27,8 @@ def nz_horiz_seismic_shear(spectral_shape_factor, hazard_factor, return_per_fact
         Near-fault factor N(T,D), obtained from Clause 3.1.6.
     perform_factor : float
         Structural Performance factor Sp, obtained from Clause 4.4.
-    ductility_factor : float
-        Ductility factor Ku, obtained from
+    inelastic_spectrum_fac : float
+        Inelastic spectrum scaling factor Ku, obtained from Clause 5.2.1.1
     seismic_weight: float
         Seismic weight of structure
 
@@ -42,7 +42,7 @@ def nz_horiz_seismic_shear(spectral_shape_factor, hazard_factor, return_per_fact
                                  return_per_factor_uls * fault_factor)  # C(T1); Clause 3.1.1
 
     horiz_design_action_coeff = (elastic_spectrum_ordinate * perform_factor /
-                                 ductility_factor)  # Cd(T1); Clause 5.2.1.1
+                                 inelastic_spectrum_fac)  # Cd(T1); Clause 5.2.1.1
 
     action_coeff_lower_lim1 = (hazard_factor/20 + 0.02)*return_per_factor_uls  # Eqn. 5.2(2)
     action_coeff_lower_lim2 = 0.03 * return_per_factor_uls
@@ -52,7 +52,6 @@ def nz_horiz_seismic_shear(spectral_shape_factor, hazard_factor, return_per_fact
     horiz_sesimic_shear = horiz_design_action_coeff * seismic_weight  # V; Clause 6.2.1
 
     return round(horiz_sesimic_shear, 2)
-
 
 
 def nz_horiz_force_distribution(total_base_shear, story_weights, story_heights):

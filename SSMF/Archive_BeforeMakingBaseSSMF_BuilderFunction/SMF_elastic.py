@@ -22,6 +22,9 @@ from helper_functions.create_floor_shell import refine_mesh
 from helper_functions.create_floor_shell import create_shell
 from helper_functions.build_smf_column import create_columns
 from helper_functions.build_smf_beam import create_beams
+
+from helper_functions.set_recorders import create_beam_recorders, create_column_recorders
+
 from helper_functions.get_beam_col_demands import process_beam_col_resp
 from helper_functions.get_story_drift import compute_story_drifts
 from helper_functions.cqc_modal_combo import modal_combo
@@ -226,8 +229,8 @@ bm_transf_tag_y = 4  # Beams oriented in Global-Y direction
 bm_mom_inertia_strong = np.array(list(nzs_beams['Ix']))
 
 # The geometric properties of the beams will be defined relative to the stiffness of the first floor beam
-base_Ix = 369.56639854764785 # No need to multiply by 'mm' or '1E6' 3561.843753793359, 0.015280903208116023
-slope_Ix_line = 0.009959027983246023
+base_Ix = 2298.7048604828824 # No need to multiply by 'mm' or '1E6' 417.7432978338827, 0.021177254839192305
+slope_Ix_line = 0.029663644378437055
 col_group_heights = np.array([0, 6.2, 15.5, 24.8, 31])  # Height of column groups from the 1st floor
 
 # Assume linear relationship
@@ -328,7 +331,7 @@ def create_floor(elev, floor_num, beam_prop=None, col_prop=None, floor_label='',
                 ops.node(node_num, x_val, unique_ys[jj], elev)
 
             'Store node tags for nodes at the location of columns'
-            # Check if the current node is at the location of a wall or column
+            # Check if the current node is at the location of an SSMF column
             if (smf_coords_df == [x_val, unique_ys[jj]]).all(1).any():
 
                 # Get the row index
@@ -488,12 +491,12 @@ def build_model():
 
         for tag in elem_tags:
 
-            # Only select beam elements
-            if str(tag).startswith('2' + floor):
+            # Only select beam elements (exclude rigid elements at ends)
+            if str(tag).startswith('2' + floor) and len(str(tag)) == 5:
                 floor_bm_tags.append(tag)
 
-            # Only select column elements
-            if str(tag).startswith('3' + floor):
+            # Only select column elements (exclude rigid elements at ends)
+            if str(tag).startswith('3' + floor) and len(str(tag)) == 5:
                 floor_col_tags.append(tag)
 
         beam_tags.append(floor_bm_tags)
@@ -639,31 +642,10 @@ if mrsa:
         os.makedirs(mrsa_res_folder, exist_ok=True)
 
         # Create recorders for beam-response in direction of excitation
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor01_beamResp.txt', '-precision', 9, '-region', 201, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor02_beamResp.txt', '-precision', 9, '-region', 202, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor03_beamResp.txt', '-precision', 9, '-region', 203, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor04_beamResp.txt', '-precision', 9, '-region', 204, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor05_beamResp.txt', '-precision', 9, '-region', 205, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor06_beamResp.txt', '-precision', 9, '-region', 206, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor07_beamResp.txt', '-precision', 9, '-region', 207, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor08_beamResp.txt', '-precision', 9, '-region', 208, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor09_beamResp.txt', '-precision', 9, '-region', 209, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor10_beamResp.txt', '-precision', 9, '-region', 210, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor11_beamResp.txt', '-precision', 9, '-region', 211, 'force')
+        create_beam_recorders(ops, mrsa_res_folder)
 
         # Create recorders for column response in direction of excitation
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor01_colResp.txt', '-precision', 9, '-region', 301, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor02_colResp.txt', '-precision', 9, '-region', 302, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor03_colResp.txt', '-precision', 9, '-region', 303, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor04_colResp.txt', '-precision', 9, '-region', 304, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor05_colResp.txt', '-precision', 9, '-region', 305, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor06_colResp.txt', '-precision', 9, '-region', 306, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor07_colResp.txt', '-precision', 9, '-region', 307, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor08_colResp.txt', '-precision', 9, '-region', 308, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor09_colResp.txt', '-precision', 9, '-region', 309, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor10_colResp.txt', '-precision', 9, '-region', 310, 'force')
-        ops.recorder('Element', '-file', mrsa_res_folder + 'floor11_colResp.txt', '-precision', 9, '-region', 311, 'force')
-
+        create_column_recorders(ops, mrsa_res_folder)
 
         # Create recorders to store nodal displacements at the building edges
         ops.recorder('Node', '-file', mrsa_res_folder + 'lowerLeftCornerDisp.txt', '-node', *list(smf_node_tags.loc['col1'])[1:], '-dof', direcs[ii], 'disp')
@@ -691,7 +673,7 @@ ops.wipe()
 print('\nMRSA completed.')
 print('======================================================')
 
-
+# """
 # ============================================================================
 # Compute Torsional Irregularity Ratio (TIR)
 # ============================================================================
@@ -894,30 +876,10 @@ for ii in range(len(torsional_direc)):
         os.makedirs(accident_torsion_res_folder, exist_ok=True)
 
         # Create recorder for beam-response in direction of static loading
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor01_beamResp.txt', '-precision', 9, '-region', 201, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor02_beamResp.txt', '-precision', 9, '-region', 202, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor03_beamResp.txt', '-precision', 9, '-region', 203, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor04_beamResp.txt', '-precision', 9, '-region', 204, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor05_beamResp.txt', '-precision', 9, '-region', 205, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor06_beamResp.txt', '-precision', 9, '-region', 206, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor07_beamResp.txt', '-precision', 9, '-region', 207, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor08_beamResp.txt', '-precision', 9, '-region', 208, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor09_beamResp.txt', '-precision', 9, '-region', 209, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor10_beamResp.txt', '-precision', 9, '-region', 210, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor11_beamResp.txt', '-precision', 9, '-region', 211, 'force')
+        create_beam_recorders(ops, accident_torsion_res_folder)
 
         # Create recorders for column response direction of static loading
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor01_colResp.txt', '-precision', 9, '-region', 301, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor02_colResp.txt', '-precision', 9, '-region', 302, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor03_colResp.txt', '-precision', 9, '-region', 303, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor04_colResp.txt', '-precision', 9, '-region', 304, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor05_colResp.txt', '-precision', 9, '-region', 305, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor06_colResp.txt', '-precision', 9, '-region', 306, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor07_colResp.txt', '-precision', 9, '-region', 307, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor08_colResp.txt', '-precision', 9, '-region', 308, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor09_colResp.txt', '-precision', 9, '-region', 309, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor10_colResp.txt', '-precision', 9, '-region', 310, 'force')
-        ops.recorder('Element', '-file', accident_torsion_res_folder + 'floor11_colResp.txt', '-precision', 9, '-region', 311, 'force')
+        create_column_recorders(ops, accident_torsion_res_folder)
 
         # Recorders for COM displacement
         ops.recorder('Node', '-file', accident_torsion_res_folder + 'COM_disp' + torsional_direc[ii] + '.txt',

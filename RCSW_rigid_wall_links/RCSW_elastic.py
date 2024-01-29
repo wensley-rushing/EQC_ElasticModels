@@ -278,6 +278,8 @@ shell_nu = conc_nu  # Poisson's ratio
 com_node_tags = {}
 total_floor_mass = {}
 
+ductility_factor = 1.25  # RCSW
+
 # ============================================================================
 # Define function to create a floor
 # ============================================================================
@@ -410,15 +412,13 @@ def create_floor(elev, floor_num, floor_label=''):
         com_y = com_data['yMass_yCoord'].sum() / com_data['yMass'].sum()
 
         # Create COM node
-        # ops.node(com_node, com_x, com_y, elev)
+        ops.node(com_node, com_x, com_y, elev)
 
         # Constraints for Rigid Diaphragm Primary node
-        # ops.fix(com_node, 0, 0, 1, 1, 1, 0)  # dx, dy, dz, rx, ry, rz
-
-        # ops.fix(com_node, 0, 0, 1, 1, 1, 0)  # dx, dy, dz, rx, ry, rz
+        ops.fix(com_node, 0, 0, 1, 1, 1, 0)  # dx, dy, dz, rx, ry, rz
 
         # Impose rigid diaphragm constraint
-        # ops.rigidDiaphragm(3, com_node, *floor_node_tags)
+        ops.rigidDiaphragm(3, com_node, *floor_node_tags)
 
         # Add COM node tag of current floor to dictionary
         com_node_tags[floor_num] = com_node
@@ -691,7 +691,7 @@ grav_rxn_forces = np.loadtxt(grav_direc + 'nodeRxn.txt').T
 
 # Load spectral accelerations and periods for response spectrum
 # Using Wellington's Hazard
-spect_acc = np.loadtxt('../nz_spectral_acc.txt')
+spect_acc = np.loadtxt('../nz_spectral_acc.txt') / ductility_factor
 spect_periods = np.loadtxt('../nz_periods.txt')
 
 
@@ -732,7 +732,7 @@ mrsa_base_shearY = modal_combo(np.loadtxt('./mrsa_results/dirY/baseShearY.txt'),
                                                                                  damping_ratio, num_modes)
 
 
-"""
+# """
 # ============================================================================
 # Compute Torsional Irregularity Ratio (TIR)
 # ============================================================================
@@ -753,7 +753,7 @@ lower_right_corner_dispY = modal_combo(np.loadtxt('./mrsa_results/dirY/lowerRigh
 
 tir_y_edgeE = np.maximum(upper_right_corner_dispY, lower_right_corner_dispY) / (0.5*(upper_right_corner_dispY + lower_right_corner_dispY))  # Right edge of building plan
 tir_y_edgeF = np.maximum(lower_left_corner_dispY, lower_right_corner_dispY) / (0.5*(lower_left_corner_dispY + lower_right_corner_dispY))    # Bottom edge of building plan
-"""
+# """
 
 # ============================================================================
 # Perform ELF
@@ -764,7 +764,6 @@ return_per_factor_sls = 0.25
 return_per_factor_uls = 1.3
 fault_factor = 1.0
 perform_factor = 0.7
-ductility_factor = 1.25  # RCSW
 story_weights = np.array(list(total_floor_mass.values())) * grav_metric
 seismic_weight = story_weights.sum()
 
@@ -781,7 +780,7 @@ elf_mrsaX_scale_factor = max(elf_base_shear / mrsa_base_shearX, 1)
 elf_mrsaY_scale_factor = max(elf_base_shear / mrsa_base_shearY, 1)
 
 
-"""
+# """
 # ============================================================================
 # Check drift and stability requirements
 # ============================================================================
@@ -1138,4 +1137,4 @@ wall_Pdel_posY = np.loadtxt('./accidental_torsion_results/positiveY/floor01_wall
 wall_Pdel_negY = np.loadtxt('./accidental_torsion_results/negativeY/floor01_wallResp.txt')
 wall_Pdel_negX = np.loadtxt('./accidental_torsion_results/negativeX/floor01_wallResp.txt')
 
-"""
+# """

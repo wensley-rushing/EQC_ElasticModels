@@ -20,6 +20,7 @@ from helper_functions.create_floor_shell import refine_mesh
 from helper_functions.create_floor_shell import create_shell
 from helper_functions.build_smf_column import create_columns
 from helper_functions.build_smf_beam import create_beams
+from helper_functions.set_recorders import create_beam_recorders, create_column_recorders
 from helper_functions.cqc_modal_combo import modal_combo
 from helper_functions.get_story_drift import compute_story_drifts
 from helper_functions.elf_new_zealand import nz_horiz_seismic_shear, nz_horiz_force_distribution
@@ -218,7 +219,7 @@ total_floor_mass = {}
 # ============================================================================
 # Define function to create a floor
 # ============================================================================
-def create_floor(elev, floor_num, beam_prop=None, col_prop=None, floor_label='',):
+def create_floor(elev, floor_num, beam_prop=None, col_prop=None, floor_label=''):
 
     node_compile = []  # Store node numbers grouped according to their y-coordinates
 
@@ -696,12 +697,12 @@ def build_model(optim_params):
     ops.section('LayeredShell', shell_sect_tag, 3, plate_fiber_tag, fiber_thick, plate_fiber_tag, fiber_thick, plate_fiber_tag, fiber_thick)
 
     # Define geometric transformation for beams
-    ops.geomTransf('PDelta', bm_transf_tag_x, 0, -1, 0)
-    ops.geomTransf('PDelta', bm_transf_tag_y, 1, 0, 0)  # -1, 0, 0
+    ops.geomTransf('Linear', bm_transf_tag_x, 0, -1, 0)
+    ops.geomTransf('Linear', bm_transf_tag_y, 1, 0, 0)  # -1, 0, 0
 
     # Define geometric transformation for columns
-    ops.geomTransf('PDelta', col_transf_tag_EW, 0, 1, 0)
-    ops.geomTransf('PDelta', col_transf_tag_NS, 0, 1, 0)
+    ops.geomTransf('Linear', col_transf_tag_EW, 0, 1, 0)
+    ops.geomTransf('Linear', col_transf_tag_NS, 0, 1, 0)
 
     # Define geometric transformation for rigid panel zone elements
     ops.geomTransf('Linear', pzone_transf_tag_col, 0, 1, 0)
