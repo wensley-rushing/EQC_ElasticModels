@@ -406,7 +406,8 @@ def build_model(beam_Ix_params, not_for_optimization=None):
     bm_prop_flr_8_to_10 = [bm_sect_flr_8_to_10, bm_E, bm_G, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
     bm_prop_flr_11 = [bm_sect_flr_11, bm_E, bm_G, bm_transf_tag_x, bm_transf_tag_y, pzone_transf_tag_bm_x, pzone_transf_tag_bm_y]
 
-    col_sect_flr_1 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= col_beam_mom_ratio * bm_sect_flr_1['Zx']].tolist()[-1]]
+    # The col_beam Zx ratio is amplified by 2 to account for columns with beams framing into them on opposite sides.
+    col_sect_flr_1 = nzs_cols.loc[nzs_cols.index[nzs_cols['Zx'] >= 2 * col_beam_mom_ratio * bm_sect_flr_1['Zx']].tolist()[-1]]
 
     # Keep the same column designation up the building height, while changing to lighter sections
     col_designation = col_sect_flr_1.name
