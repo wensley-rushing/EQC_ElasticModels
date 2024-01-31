@@ -28,7 +28,7 @@ bm_Ix_vals = np.array(list(nzs_beams['Ix']))
 bm_Zx_vals = np.array(list(nzs_beams['Zx']))
 
 # Maximum beam section will be a function of Zx to enable capacity design
-max_bm_Zx = bm_Zx_vals.max() / 1.25 # (Divided by 1.25 so there is an available column)
+max_bm_Zx = bm_Zx_vals.max() / (1.25 * 2) # (Divided by (1.25*2) so there is an available column in the event that 2 beams framing into a column reach Mp.)
 
 # Define bounds on possible values for first floor beam Ix.
 bm_Ix_min = bm_Ix_vals.min()
@@ -53,6 +53,7 @@ def objective_func(optim_params):
 
     # Perform MRSA
     mrsa_com_dispX, mrsa_com_dispY, elf_mrsaX_scale_factor, elf_mrsaY_scale_factor = run_mrsa(angular_freq, elf_base_shear)
+
     ops.wipe()
 
     # PDelta Analysis

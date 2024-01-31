@@ -713,13 +713,13 @@ def run_elf_analysis(periods, pattern_type, not_for_optimization=None):
         return story_weights, push_pattern,  elf_base_shear
 
 
-def run_mrsa(angular_freq, elf_base_shear, not_for_optimization=None):
+def run_mrsa(angular_freq, elf_base_shear, mrsa_results_folder=None, not_for_optimization=None):
 
     # Load spectral accelerations and periods for response spectrum
     spect_acc = np.loadtxt('../nz_spectral_acc.txt') / ductility_factor
     spect_periods = np.loadtxt('../nz_periods.txt')
 
-    perform_mrsa(ops, spect_acc, spect_periods, num_modes, './mrsa_results/dir',
+    perform_mrsa(ops, spect_acc, spect_periods, num_modes, mrsa_results_folder,
                  ssmf_cols_node_tags, not_for_optimization, com_node_tags=com_node_tags, lfrs='ssmf')
 
     if not_for_optimization:
@@ -729,10 +729,10 @@ def run_mrsa(angular_freq, elf_base_shear, not_for_optimization=None):
     # ============================================================================
     # Post-process MRSA results
     # ============================================================================
-    mrsa_base_shearX = modal_combo(np.loadtxt('./mrsa_results/dirX/baseShearX.txt'),
+    mrsa_base_shearX = modal_combo(np.loadtxt(mrsa_results_folder + 'X/baseShearX.txt'),
                                    angular_freq, damping_ratio, num_modes).sum()
 
-    mrsa_base_shearY = modal_combo(np.loadtxt('./mrsa_results/dirY/baseShearY.txt'),
+    mrsa_base_shearY = modal_combo(np.loadtxt(mrsa_results_folder + 'Y/baseShearY.txt'),
                                    angular_freq, damping_ratio, num_modes).sum()
 
     # Compute factors for scaling MRSA demands to ELF demands NZS 1170.5:2004 - Sect. 5.2.2.2b
@@ -740,8 +740,8 @@ def run_mrsa(angular_freq, elf_base_shear, not_for_optimization=None):
     elf_mrsaY_scale_factor = max(elf_base_shear / mrsa_base_shearY, 1.0)
 
     # Load in COM displacements from MRSA
-    mrsa_com_dispX = np.loadtxt('./mrsa_results/dirX/COM_dispX.txt')  # For MRSA in x-direction
-    mrsa_com_dispY = np.loadtxt('./mrsa_results/dirY/COM_dispY.txt')  # For MRSA in y-direction
+    mrsa_com_dispX = np.loadtxt(mrsa_results_folder + 'X/COM_dispX.txt')  # For MRSA in x-direction
+    mrsa_com_dispY = np.loadtxt(mrsa_results_folder + 'Y/COM_dispY.txt')  # For MRSA in y-direction
 
     return mrsa_com_dispX, mrsa_com_dispY, elf_mrsaX_scale_factor, elf_mrsaY_scale_factor
 
@@ -872,6 +872,16 @@ def run_pdelta_analysis(beam_Ix_params, pdelta_method, angular_freq, periods, st
                 # Create recorders for column response direction of static loading
                 create_column_recorders(ops, accident_torsion_res_folder)
 
+            # Create recorders to store nodal displacements at the building edges
+            ops.recorder('Node', '-file', accident_torsion_res_folder + 'lowerLeftCornerDisp' + torsional_direc[ii] + '.txt',
+                         '-node', *list(ssmf_cols_node_tags.loc['col1'])[1:], '-dof', elf_dof[ii], 'disp')
+
+            ops.recorder('Node', '-file', accident_torsion_res_folder + 'lowerRightCornerDisp' + torsional_direc[ii] + '.txt',
+                         '-node', *list(ssmf_cols_node_tags.loc['col5'])[1:], '-dof', elf_dof[ii], 'disp')
+
+            ops.recorder('Node', '-file', accident_torsion_res_folder + 'upperRightCornerDisp' + torsional_direc[ii] + '.txt',
+                         '-node', *list(ssmf_cols_node_tags.loc['col23'])[1:], '-dof', elf_dof[ii], 'disp')
+
             # Recorders for COM displacement
             ops.recorder('Node', '-file', accident_torsion_res_folder + 'COM_disp' + torsional_direc[ii] + '.txt',
                          '-node', *list(com_node_tags.values()), '-dof', elf_dof[ii], 'disp')
@@ -987,10 +997,94 @@ def run_pdelta_analysis(beam_Ix_params, pdelta_method, angular_freq, periods, st
         else:
             print('Stability requirements NOT satisfied.')
 
-        return story_driftX, story_driftY, pdelta_fac
+        return story_driftX, story_driftY, max_story_drift, max_theta, pdelta_fac
 
     else:
         return max_story_drift, max_theta
+
+
+def compute_maximum_TIR(angular_freq, mrsa_folder, pdelta_accidental_torsion_folder):
+
+    # Load PDelta corner displacements due to PDelta and/or accidental eccentricity
+    pd_lower_left_corner_disp_posX = np.loadtxt(pdelta_accidental_torsion_folder + '/positiveX/lowerLeftCornerDispX.txt')
+    pd_lower_left_corner_disp_negX = np.loadtxt(pdelta_accidental_torsion_folder + '/negativeX/lowerLeftCornerDispX.txt')
+    pd_lower_left_corner_disp_posY = np.loadtxt(pdelta_accidental_torsion_folder + '/positiveY/lowerLeftCornerDispY.txt')
+    pd_lower_left_corner_disp_negY = np.loadtxt(pdelta_accidental_torsion_folder + '/negativeY/lowerLeftCornerDispY.txt')
+
+    pd_lower_right_corner_disp_posX = np.loadtxt(pdelta_accidental_torsion_folder + '/positiveX/lowerRightCornerDispX.txt')
+    pd_lower_right_corner_disp_negX = np.loadtxt(pdelta_accidental_torsion_folder + '/negativeX/lowerRightCornerDispX.txt')
+    pd_lower_right_corner_disp_posY = np.loadtxt(pdelta_accidental_torsion_folder + '/positiveY/lowerRightCornerDispY.txt')
+    pd_lower_right_corner_disp_negY = np.loadtxt(pdelta_accidental_torsion_folder + '/negativeY/lowerRightCornerDispY.txt')
+
+    pd_upper_right_corner_disp_posX = np.loadtxt(pdelta_accidental_torsion_folder + '/positiveX/upperRightCornerDispX.txt')
+    pd_upper_right_corner_disp_negX = np.loadtxt(pdelta_accidental_torsion_folder + '/negativeX/upperRightCornerDispX.txt')
+    pd_upper_right_corner_disp_posY = np.loadtxt(pdelta_accidental_torsion_folder + '/positiveY/upperRightCornerDispY.txt')
+    pd_upper_right_corner_disp_negY = np.loadtxt(pdelta_accidental_torsion_folder + '/negativeY/upperRightCornerDispY.txt')
+
+
+    # Obtain peak total modal response for corner node displacments
+    # MRSA - X
+    mrsa_lower_left_corner_dispX = modal_combo(np.loadtxt(mrsa_folder + '/dirX/lowerLeftCornerDisp.txt'),
+                                          angular_freq, damping_ratio, num_modes)
+
+    mrsa_upper_right_corner_dispX = modal_combo(np.loadtxt(mrsa_folder + '/dirX/upperRightCornerDisp.txt'),
+                                           angular_freq, damping_ratio, num_modes)
+
+    mrsa_lower_right_corner_dispX = modal_combo(np.loadtxt(mrsa_folder + '/dirX/lowerRightCornerDisp.txt'),
+                                           angular_freq, damping_ratio, num_modes)
+
+    # MRSA - Y
+    mrsa_lower_left_corner_dispY = modal_combo(np.loadtxt(mrsa_folder + '/dirY/lowerLeftCornerDisp.txt'),
+                                          angular_freq, damping_ratio, num_modes)
+
+    mrsa_upper_right_corner_dispY = modal_combo(np.loadtxt(mrsa_folder + '/dirY/upperRightCornerDisp.txt'),
+                                           angular_freq, damping_ratio, num_modes)
+
+    mrsa_lower_right_corner_dispY = modal_combo(np.loadtxt(mrsa_folder + '/dirY/lowerRightCornerDisp.txt'),
+                                           angular_freq, damping_ratio, num_modes)
+
+    # Extract most critical combo of MRSA + PDelta-Accidental torsional results
+    lower_left_corner_dispX = np.maximum(mrsa_lower_left_corner_dispX + pd_lower_left_corner_disp_posX,
+                                         mrsa_lower_left_corner_dispX + pd_lower_left_corner_disp_negX)
+
+    lower_right_corner_dispX = np.maximum(mrsa_lower_right_corner_dispX + pd_lower_right_corner_disp_posX,
+                                          mrsa_lower_right_corner_dispX + pd_lower_right_corner_disp_negX)
+
+    upper_right_corner_dispX = np.maximum(mrsa_upper_right_corner_dispX + pd_upper_right_corner_disp_posX,
+                                          mrsa_upper_right_corner_dispX + pd_upper_right_corner_disp_negX)
+
+    lower_left_corner_dispY = np.maximum(mrsa_lower_left_corner_dispY + pd_lower_left_corner_disp_posY,
+                                         mrsa_lower_left_corner_dispY + pd_lower_left_corner_disp_negY)
+
+    lower_right_corner_dispY = np.maximum(mrsa_lower_right_corner_dispY + pd_lower_right_corner_disp_posY,
+                                         mrsa_lower_right_corner_dispY + pd_lower_right_corner_disp_negY)
+
+    upper_right_corner_dispY = np.maximum(mrsa_upper_right_corner_dispY + pd_upper_right_corner_disp_posY,
+                                         mrsa_upper_right_corner_dispY + pd_upper_right_corner_disp_negY)
+
+    # Compute TIR (delta_max / delta_avg)
+    right_edge_tirX = np.max(
+                            (np.maximum(upper_right_corner_dispX, lower_right_corner_dispX)
+                             / (0.5*(upper_right_corner_dispX + lower_right_corner_dispX)))
+                            )  # Right edge of building plan
+
+    bottom_edge_tirX = np.max(
+                            (np.maximum(lower_left_corner_dispX, lower_right_corner_dispX)
+                             / (0.5*(lower_left_corner_dispX + lower_right_corner_dispX)))
+                            )    # Bottom edge of building plan
+
+    right_edge_tirY = np.max(
+                            (np.maximum(upper_right_corner_dispY, lower_right_corner_dispY) /
+                             (0.5*(upper_right_corner_dispY + lower_right_corner_dispY)))
+                            )  # Right edge of building plan
+
+    bottom_edge_tirY = np.max(
+                            (np.maximum(lower_left_corner_dispY, lower_right_corner_dispY) /
+                             (0.5*(lower_left_corner_dispY + lower_right_corner_dispY)))
+                            )    # Bottom edge of building plan
+
+
+    return round(max(right_edge_tirX, bottom_edge_tirX, right_edge_tirY, bottom_edge_tirY), 2)
 
 
 def get_mrsa_and_torsional_demands(angular_freq, pdelta_fac, elf_mrsaX_fac,

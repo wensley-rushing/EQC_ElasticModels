@@ -18,7 +18,7 @@ sys.path.append('./')
 
 from generate_ssmf_model import (build_model, run_eigen_gravity_analysis,
                                  run_elf_analysis, run_mrsa, run_pdelta_analysis,
-                                 get_mrsa_and_torsional_demands)
+                                 compute_maximum_TIR)
 
 # Initialize array of possible values for beam Ix
 nzs_beams = pd.read_excel('../../../nzs_steel_database.xlsx', sheet_name='Beams',
@@ -52,23 +52,20 @@ def objective_func(optim_params):
     story_weights, elf_push_pattern, elf_base_shear = run_elf_analysis(periods, 'modal')
 
     # Perform MRSA
-    mrsa_com_dispX, mrsa_com_dispY, elf_mrsaX_scale_factor, elf_mrsaY_scale_factor = run_mrsa(angular_freq, elf_base_shear)
+    mrsa_com_dispX, mrsa_com_dispY, elf_mrsaX_scale_factor, elf_mrsaY_scale_factor = run_mrsa(angular_freq, elf_base_shear,
+                                                                                              mrsa_results_folder='./optimization_results/mrsa_results/dir')
     ops.wipe()
 
     # PDelta Analysis
     pdelta_method = 'B'
-    _, max_theta = run_pdelta_analysis(optim_params, pdelta_method, angular_freq, periods, story_weights,
+    _, theta = run_pdelta_analysis(optim_params, pdelta_method, angular_freq, periods, story_weights,
                                                     mrsa_com_dispX, mrsa_com_dispY, elf_base_shear, elf_push_pattern,
                                                     elf_mrsaX_scale_factor, elf_mrsaY_scale_factor,
                                                     results_root_folder='./optimization_results/')
 
-    # # Beam & Column demands
-    # beam_demands_X, beam_demands_Y, col_demands_X, col_demands_Y = get_mrsa_and_torsional_demands(angular_freq,
-    #                                                                                               pdelta_factor, elf_mrsaX_scale_factor,
-    #                                                                                               elf_mrsaY_scale_factor, './mrsa_results',
-    #                                                                                               './accidental_torsion_results')
+    max_tir = compute_maximum_TIR(angular_freq, './optimization_results/mrsa_results', './optimization_results/accidental_torsion_results')
 
-    return max_theta
+    return [max_tir, theta]
 
 '*********************************************************************************************'
 '*********************************************************************************************'
@@ -114,17 +111,18 @@ class Particle:
             self.particle_velocity.append(random.uniform(-1, 1))  # generate random initial velocity
 
     def evaluate(self, objective_func):
+        print(self.particle_position)
         self.fitness_particle_position = objective_func(self.particle_position)
         # print(self.fitness_particle_position)
 
         if optim_prob == -1:
-            if self.fitness_particle_position < self.fitness_local_best_particle_position:
+            if self.fitness_particle_position[0] < self.fitness_local_best_particle_position:
                 self.local_best_particle_position = self.particle_position  # update the local best
-                self.fitness_local_best_particle_position = self.fitness_particle_position  # update the fitness of the local best
+                self.fitness_local_best_particle_position = self.fitness_particle_position[0]  # update the fitness of the local best
         if optim_prob == 1:
-            if self.fitness_particle_position > self.fitness_local_best_particle_position:
+            if self.fitness_particle_position[0] > self.fitness_local_best_particle_position:
                 self.local_best_particle_position = self.particle_position  # update the local best
-                self.fitness_local_best_particle_position = self.fitness_particle_position  # update the fitness of the local best
+                self.fitness_local_best_particle_position = self.fitness_particle_position[0]  # update the fitness of the local best
 
     def update_velocity(self, global_best_particle_position):
         for i in range(nv):
@@ -147,8 +145,8 @@ class Particle:
             if self.particle_position[i] < bounds[i][0]:
                 self.particle_position[i] = bounds[i][1] - ((bounds[i][0] - self.particle_position[i]) % np.abs(bounds[i][0] - bounds[i][1]))
 
-global_best_theta_difference = initial_fitness
-global_best_theta = initial_fitness
+global_best_TIR_difference = initial_fitness
+global_best_TIR = initial_fitness
 global_best_particle_position = []
 
 # Build swarm
@@ -163,36 +161,46 @@ tol = 1E-6
 converg_count = 0
 
 iter_count = 0
-theta_limit = 0.3  # Limit on stability per NZS 1170.5:2004 - Sect 6.5.1
+TIR_limit = 1.4  # TIR limit
+
+theta = np.inf
+theta_limit = 0.3 # Stability limit
+
+
 
 # for i in range(iterations):
-while global_best_theta > theta_limit and global_best_theta_difference > 0.1:
+while global_best_TIR_difference > 0.01 and theta > theta_limit:
     print("Iteration {}".format(iter_count+1))
 
     # cycle through particles in swarm and evaluate fitness
     for j in range(particle_size):
         print("Particle " + str(j+1))
         swarm[j].evaluate(objective_func)
-        print("Theta: {:.3f}".format(swarm[j].fitness_particle_position))
+
+        tir = float(swarm[j].fitness_particle_position[0])
+        theta = float(swarm[j].fitness_particle_position[1])
+        tir_diff = abs(tir - TIR_limit)
+
+        print("TIR: {:.2f}".format(tir))
 
         # determine if current particle is the best (globally)
         if optim_prob == -1:
-            print("Best theta difference as at last iteration: {:.3f}".format(global_best_theta_difference))
+            print("Best TIR difference as at last iteration: {:.3f}".format(global_best_TIR_difference))
+            print("TIR difference for current iteration : {:.3f}".format(tir_diff))
+            print("Current theta: {:.3f}".format(theta))
 
-            theta_diff = abs(swarm[j].fitness_particle_position - theta_limit)
-            print("Theta difference for current iteration : {:.3f}".format(theta_diff))
-
-            if theta_diff < global_best_theta_difference and swarm[j].fitness_particle_position < theta_limit:
+            if tir_diff < global_best_TIR_difference and theta < theta_limit:
                 global_best_particle_position = list(swarm[j].particle_position)
-                global_best_theta = float(swarm[j].fitness_particle_position)
-                global_best_theta_difference = float(theta_diff)
+                global_best_TIR = tir
+                global_best_TIR_difference = float(tir_diff)
 
         if optim_prob == 1:
-            if swarm[j].fitness_particle_position > global_best_theta_difference:
+            if tir_diff > global_best_TIR_difference and theta < theta_limit:
                 global_best_particle_position = list(swarm[j].particle_position)
-                global_best_theta_difference = float(swarm[j].fitness_particle_position)
+                global_best_TIR = tir
+                global_best_TIR_difference = float(tir_diff)
 
-        print("New best theta diff: {:.3f}".format(global_best_theta_difference))
+        print("New best TIR diff: {:.3f}".format(global_best_TIR_difference))
         print("")
 
    # cycle through swarm and update velocities and position
@@ -200,11 +208,11 @@ while global_best_theta > theta_limit and global_best_theta_difference > 0.1:
         swarm[j].update_velocity(global_best_particle_position)
         swarm[j].update_position(bounds)
 
-    fitness_history.append(global_best_theta_difference)  # record the best fitness
+    fitness_history.append(global_best_TIR_difference)  # record the best fitness
     param_history.append(global_best_particle_position)  # record associated fitness parameters for each iteration
 
     print('iteration: {}, best_solution: {}, best_fitness: {}'.format(iter_count+1, global_best_particle_position,
-                                                                      global_best_theta_difference))
+                                                                      global_best_TIR_difference))
 
     if iter_count > 0:
         if abs(fitness_history[-1] - fitness_history[-2]) < tol:
@@ -215,17 +223,17 @@ while global_best_theta > theta_limit and global_best_theta_difference > 0.1:
         if converg_count == 20:
             break
 
-    print("After iter {}: ".format(iter_count+1), global_best_theta, global_best_theta_difference)
+    print("After iter {}: ".format(iter_count+1), global_best_TIR, global_best_TIR_difference)
     print("")
     iter_count += 1
 
 print('Optimal solution:', global_best_particle_position)
-print('Objective function value:', global_best_theta_difference)
+print('Objective function value:', global_best_TIR_difference)
 
 run_time = time.time() - init_time
 print("\nRun time:  {} secs".format(run_time))
 
-convergence_history = open("./optimization_results/SMF_nzs_theta.txt", 'w+')
+convergence_history = open("./optimization_results/SMF_nzs_TIR_" + str(TIR_limit) +".txt", 'w+')
 convergence_history.write("Best Solution History: " + str(param_history) + "\n \n")
 convergence_history.write("Best Fitness History: " + str(fitness_history) + "\n")
 convergence_history.write("Run time: " + str(run_time) + " secs\n")

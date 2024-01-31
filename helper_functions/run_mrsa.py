@@ -39,17 +39,6 @@ def perform_mrsa(ops, spect_acc, spect_periods, num_modes, results_direc,
                 # Create recorders for beam response in direction of excitation
                 create_beam_recorders(ops, mrsa_res_folder)
 
-                # Create recorders to store nodal displacements at the building edges
-                ops.recorder('Node', '-file', mrsa_res_folder + 'lowerLeftCornerDisp.txt',
-                             '-node', *list(lfre_node_tags.loc['col1'])[1:], '-dof', direcs[ii], 'disp')
-
-                ops.recorder('Node', '-file', mrsa_res_folder + 'lowerRightCornerDisp.txt',
-                             '-node', *list(lfre_node_tags.loc['col5'])[1:], '-dof', direcs[ii], 'disp')
-
-                ops.recorder('Node', '-file', mrsa_res_folder + 'upperRightCornerDisp.txt',
-                             '-node', *list(lfre_node_tags.loc['col23'])[1:], '-dof', direcs[ii], 'disp')
-
-
             if lfrs == 'rcsw':
 
                 # Create recorders for wall response in direction of excitation
@@ -58,15 +47,28 @@ def perform_mrsa(ops, spect_acc, spect_periods, num_modes, results_direc,
                 # Create recorders for wall rigid links in direction of excitation
                 create_wall_rigid_link_recorders(ops, mrsa_res_folder)
 
-                # Create recorders to store nodal displacements at the building edges
-                ops.recorder('Node', '-file', mrsa_res_folder + 'lowerLeftCornerDisp.txt',
-                              '-node', *list(wall_ends_node_tags.loc['wall1_l'])[1:], '-dof', direcs[ii], 'disp')
 
-                ops.recorder('Node', '-file', mrsa_res_folder + 'upperRightCornerDisp.txt',
-                              '-node', *list(wall_ends_node_tags.loc['wall10_r'])[1:], '-dof', direcs[ii], 'disp')
+        if lfrs == 'ssmf' and results_direc:
+            # Create recorders to store nodal displacements at the building edges
+            ops.recorder('Node', '-file', mrsa_res_folder + 'lowerLeftCornerDisp.txt',
+                         '-node', *list(lfre_node_tags.loc['col1'])[1:], '-dof', direcs[ii], 'disp')
 
-                ops.recorder('Node', '-file', mrsa_res_folder + 'lowerRightCornerDisp.txt',
-                              '-node', *list(lfre_node_tags.loc['col3'])[1:], '-dof', direcs[ii], 'disp')
+            ops.recorder('Node', '-file', mrsa_res_folder + 'lowerRightCornerDisp.txt',
+                         '-node', *list(lfre_node_tags.loc['col5'])[1:], '-dof', direcs[ii], 'disp')
+
+            ops.recorder('Node', '-file', mrsa_res_folder + 'upperRightCornerDisp.txt',
+                         '-node', *list(lfre_node_tags.loc['col23'])[1:], '-dof', direcs[ii], 'disp')
+
+        if lfrs == 'rcsw' and results_direc:
+            # Create recorders to store nodal displacements at the building edges
+            ops.recorder('Node', '-file', mrsa_res_folder + 'lowerLeftCornerDisp.txt',
+                          '-node', *list(wall_ends_node_tags.loc['wall1_l'])[1:], '-dof', direcs[ii], 'disp')
+
+            ops.recorder('Node', '-file', mrsa_res_folder + 'upperRightCornerDisp.txt',
+                          '-node', *list(wall_ends_node_tags.loc['wall10_r'])[1:], '-dof', direcs[ii], 'disp')
+
+            ops.recorder('Node', '-file', mrsa_res_folder + 'lowerRightCornerDisp.txt',
+                          '-node', *list(lfre_node_tags.loc['col3'])[1:], '-dof', direcs[ii], 'disp')
 
         # Base shear
         ops.recorder('Node', '-file', mrsa_res_folder + 'baseShear' + axis[ii] + '.txt',
