@@ -8,7 +8,7 @@ Created on Thu May 25 17:43:33 2023
 import os
 import sys
 import math
-import openseespy.opensees as ops
+import opensees.openseespy as ops
 # import opsvis as opsv
 import matplotlib.pyplot as plt
 import matplotlib as mpl

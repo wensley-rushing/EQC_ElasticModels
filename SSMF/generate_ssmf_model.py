@@ -8,7 +8,7 @@ Created on Sun Jan 28 16:38:55 2024
 # Import required modules
 import os
 import sys
-import openseespy.opensees as ops
+import opensees.openseespy as ops
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt

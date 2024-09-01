@@ -10,7 +10,7 @@ import time
 import random
 import numpy as np
 import pandas as pd
-import openseespy.opensees as ops
+import opensees.openseespy as ops
 
 
 # Append directory of helper functions to Python Path

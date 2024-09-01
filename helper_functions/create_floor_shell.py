@@ -5,7 +5,7 @@ Created on Tue Jun 27 16:45:42 2023
 @author: udu
 """
 import numpy as np
-import openseespy.opensees as ops
+import opensees.openseespy as ops
 
 
 # Define Units

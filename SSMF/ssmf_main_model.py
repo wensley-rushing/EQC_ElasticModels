@@ -6,7 +6,7 @@ Created on Sun Jan 28 18:15:11 2024
 """
 
 import sys
-import openseespy.opensees as ops
+import opensees.openseespy as ops
 import numpy as np
 # import opsvis as opsv
 

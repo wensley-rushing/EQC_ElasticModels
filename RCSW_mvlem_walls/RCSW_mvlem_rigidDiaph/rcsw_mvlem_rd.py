@@ -7,7 +7,7 @@ Created on Tue Jan 16 13:57:06 2024
 
 # import os
 import sys
-import openseespy.opensees as ops
+import opensees.openseespy as ops
 # import opsvis as opsv
 import numpy as np
 # import pandas as pd

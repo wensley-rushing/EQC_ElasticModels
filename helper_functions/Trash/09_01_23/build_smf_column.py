@@ -5,7 +5,7 @@ Created on Mon Jul 24 09:42:03 2023
 @author: Uzo Uwaoma - udu@uw.edu
 """
 
-import openseespy.opensees as ops
+import opensees.openseespy as ops
 
 
 def create_columns(floor_num, smf_node_tags, col_EW_prop, col_NS_prop, pz_prop_col):

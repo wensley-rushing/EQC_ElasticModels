@@ -9,7 +9,7 @@ import os
 import sys
 import time
 import random
-import openseespy.opensees as ops
+import opensees.openseespy as ops
 import pandas as pd
 import numpy as np
 

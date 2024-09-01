@@ -7,7 +7,7 @@ Created on Thu May 25 17:43:33 2023
 # Import required modules
 import os
 import sys
-import openseespy.opensees as ops
+import opensees.openseespy as ops
 import opsvis as opsv
 import pandas as pd
 import numpy as np

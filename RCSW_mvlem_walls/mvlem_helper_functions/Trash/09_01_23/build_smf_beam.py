@@ -5,7 +5,7 @@ Created on Mon Jul 24 10:20:32 2023
 @author: Uzo Uwaoma - udu@uw.edu
 """
 
-import openseespy.opensees as ops
+import opensees.openseespy as ops
 
 
 def create_beams(floor_num, elev, com_node, smf_node_tags, smf_coords_df, bm_prop):

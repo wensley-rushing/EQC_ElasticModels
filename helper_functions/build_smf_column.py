@@ -5,7 +5,7 @@ Created on Mon Jul 24 09:42:03 2023
 @author: Uzo Uwaoma - udu@uw.edu
 """
 
-import openseespy.opensees as ops
+import opensees.openseespy as ops
 
 # Define Units
 sec = 1
