@@ -1,1 +1,2 @@
-# EQC_ElasticModels
+# EQC Elastic Models with Xara
+
